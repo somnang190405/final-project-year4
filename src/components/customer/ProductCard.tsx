@@ -3,6 +3,7 @@ import { Product } from '../../types';
 import { Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent } from '../../services/pricing';
+import { User } from '../../types';
 
 interface ProductCardProps {
   product: Product;
@@ -15,6 +16,8 @@ interface ProductCardProps {
   textAlign?: 'center' | 'left';
   pricePrefix?: string;
   elevated?: boolean;
+  user?: User | null;
+  onRequireAuth?: () => void;
 }
 
 const ProductCard = ({
@@ -28,6 +31,8 @@ const ProductCard = ({
   textAlign,
   pricePrefix = 'US $',
   elevated = true,
+  user,
+  onRequireAuth,
 }: ProductCardProps) => {
   const navigate = useNavigate();
   const [added, setAdded] = React.useState(false);
@@ -91,6 +96,10 @@ const ProductCard = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              if (!user) {
+                onRequireAuth?.();
+                return;
+              }
               if (onToggleWishlist) {
                 onToggleWishlist(product.id);
               } else {
@@ -128,6 +137,10 @@ const ProductCard = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
+            if (!user) {
+              onRequireAuth?.();
+              return;
+            }
             if (!isSoldOut) {
               onAdd(product);
               setAdded(true);

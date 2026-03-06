@@ -21,18 +21,29 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
+    console.log('Adding to cart:', item);
     setCart((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       const stock = Math.max(0, Number((item as any).stock ?? existing?.stock ?? 0));
-      if (stock <= 0) return prev;
+      if (stock <= 0) {
+        console.warn('Cannot add item: out of stock', item.id);
+        return prev;
+      }
       if (existing) {
         // Prevent exceeding available stock.
-        if (existing.quantity >= stock) return prev;
-        return prev.map((i) =>
+        if (existing.quantity >= stock) {
+          console.warn('Cannot add more: would exceed stock', item.id, existing.quantity, stock);
+          return prev;
+        }
+        const newCart = prev.map((i) =>
           i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
         );
+        console.log('Updated cart item quantity:', item.id, existing.quantity + 1);
+        return newCart;
       }
-      return [...prev, { ...item, quantity: 1 }];
+      const newCart = [...prev, { ...item, quantity: 1 }];
+      console.log('Added new item to cart:', item.id);
+      return newCart;
     });
   };
 
@@ -53,7 +64,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  const hydrateCart = (items: CartItem[]) => setCart(items);
+  const hydrateCart = (items: CartItem[]) => {
+    console.log('Hydrating cart with items:', items.length);
+    setCart(items);
+  };
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, hydrateCart }}>

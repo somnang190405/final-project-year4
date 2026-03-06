@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email in [
+          'admin@tinhme.com',
+          'your-email@example.com'
+        ]
+      );
+    }
+
+    // Public read for product images; authenticated users can write for now (TODO: restrict to admin only)
+    match /products/{allPaths=**} {
+      allow read: if true;
+      allow write: if signedIn();  // Temporarily allow any authenticated user
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

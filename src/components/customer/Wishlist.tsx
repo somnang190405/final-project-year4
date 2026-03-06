@@ -4,14 +4,17 @@ import { listenProducts } from '../../services/firestoreService';
 import { Product } from '../../types';
 import ProductCard from './ProductCard';
 import { Heart } from 'lucide-react';
+import { User } from '../../types';
 
 type Props = {
   wishlist: string[];
   toggleWishlist: (id: string) => void;
   setView: (view: string) => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
 };
 
-const Wishlist = ({ wishlist, toggleWishlist, setView }: Props) => {
+const Wishlist = ({ wishlist, toggleWishlist, setView, user, onRequireAuth }: Props) => {
   const { addToCart } = useCart();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
@@ -49,6 +52,8 @@ const Wishlist = ({ wishlist, toggleWishlist, setView }: Props) => {
               isWishlisted={true}
               onToggleWishlist={toggleWishlist}
               variant="newArrivals"
+              user={user}
+              onRequireAuth={onRequireAuth}
             />
           </div>
         ))}

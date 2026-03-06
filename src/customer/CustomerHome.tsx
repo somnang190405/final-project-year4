@@ -6,18 +6,20 @@ import { Product } from '../types';
 import ProductCard from '../components/customer/ProductCard';
 import { useCart } from '../components/customer/CartContext';
 import './LandingPage.css';
+import { User } from '../types';
 
 
 type Props = {
   wishlist: string[];
   toggleWishlist: (id: string) => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
 };
 
-const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
+const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequireAuth }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<'WOMEN' | 'MEN' | 'SHOES' | 'BAGS' | 'ACCESSORY' | 'ALL'>('ALL');
   const navigate = useNavigate();
   const location = useLocation();
   const [banner, setBanner] = useState<string | null>(null);
@@ -57,26 +59,8 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
     return () => { if (unsub) unsub(); };
   }, []);
 
-  const tabs: Array<typeof activeTab> = ['ALL', 'MEN', 'WOMEN', 'SHOES', 'BAGS', 'ACCESSORY'];
-
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const canon = (s: string) => {
-      let k = s.trim().toLowerCase();
-      if (k === 'bag') k = 'bags';
-      if (k === 'accessories') k = 'accessory';
-      if (k === 'shoe') k = 'shoes';
-      return k;
-    };
-    const byTab = (p: Product) => {
-      if (activeTab === 'ALL') return true;
-      const catRaw = String((p.category ?? '')).trim().toLowerCase();
-      if (!catRaw) return false;
-      const cat = canon(catRaw);
-      const key = canon(activeTab);
-      // Strict match: only show products whose category equals the selected tab
-      return cat === key;
-    };
     const bySearch = (p: Product) => {
       if (!q) return true;
       return (
@@ -84,8 +68,8 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
         String(p.category ?? '').toLowerCase().includes(q)
       );
     };
-    return products.filter((p) => byTab(p) && bySearch(p));
-  }, [products, activeTab, search]);
+    return products.filter((p) => bySearch(p));
+  }, [products, search]);
 
   // Show success banner if navigated with added product name
   useEffect(() => {
@@ -144,25 +128,9 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
           ))}
         </div>
       </section>
-      {/* Product browsing section (tabs + search + grid like the screenshot) */}
+      {/* Product browsing section (search + grid) */}
       <section>
         <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex items-center justify-center gap-8 flex-wrap text-sm font-medium tracking-wide mb-8">
-            {tabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setActiveTab(t)}
-                className={
-                  t === activeTab
-                    ? "px-4 py-2 rounded-full bg-black text-white"
-                    : "px-4 py-2 rounded-full text-gray-500 hover:text-gray-900"
-                }
-              >
-                {t}
-              </button>
-            ))}
-          </div>
 
           <div className="flex items-center justify-center mb-10">
             <form
@@ -197,6 +165,8 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
                       isWishlisted={wishlist.includes(p.id)}
                       onToggleWishlist={toggleWishlist}
                       variant="newArrivals"
+                      user={user}
+                      onRequireAuth={onRequireAuth}
                     />
                   </div>
                 ))}

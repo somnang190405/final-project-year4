@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { User, UserRole, CartItem, Product } from "./types";
 import { useCart } from "./components/customer/CartContext";
+import CategoryDropdown from "./components/CategoryDropdown";
 
 // Route-level code splitting (improves first load)
 const AdminDashboard = React.lazy(() => import("./admin/AdminDashboard"));
@@ -108,41 +109,16 @@ const Navbar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [navQuery, setNavQuery] = React.useState("");
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [suggestions, setSuggestions] = React.useState<Product[]>([]);
-  const [showSuggestions, setShowSuggestions] = React.useState(false);
   const { cart } = useCart();
-  const showNavSearch = location.pathname !== '/shop';
   React.useEffect(() => {
     const close = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (!t.closest('#user-menu')) setMenuOpen(false);
-      if (!t.closest('#nav-search')) setShowSuggestions(false);
     };
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
-
-  // Debounced name-only suggestions
-  React.useEffect(() => {
-    let alive = true;
-    const q = navQuery.trim();
-    if (q.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
-    const t = window.setTimeout(async () => {
-      try {
-        const res = await searchProductsByNameOnly(q, 6);
-        if (!alive) return;
-        setSuggestions(res);
-        setShowSuggestions(res.length > 0);
-      } catch {
-        if (!alive) return;
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
-    }, 180);
-    return () => { alive = false; window.clearTimeout(t); };
-  }, [navQuery]);
   const cartCount = React.useMemo(() => cart.reduce((sum, i) => sum + i.quantity, 0), [cart]);
   return (
     <nav className="w-full py-2 px-6 flex items-center justify-between shadow-sm" style={{ position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'saturate(180%) blur(6px)', background: 'rgba(255,255,255,0.9)' }}>
@@ -153,69 +129,13 @@ const Navbar = ({
         </div>
         <span className="text-3xl font-serif font-bold text-gray-900">TinhMe</span>
       </div>
-      {/* Center: Nav links + search */}
+      {/* Center: Nav links */}
       <div className="flex-1 flex items-center justify-center gap-6">
         <div className="flex items-center gap-6 shrink-0">
           <button onClick={() => navigate('/')} className="text-base md:text-lg font-medium text-gray-600 hover:text-black whitespace-nowrap">Home</button>
           <button onClick={() => navigate('/shop')} className="text-base md:text-lg font-medium text-gray-600 hover:text-black whitespace-nowrap">Shop</button>
-          <button onClick={() => navigate('/shop?category=bags')} className="hidden md:inline text-base md:text-lg font-medium text-gray-600 hover:text-black whitespace-nowrap">Bags</button>
-          <button onClick={() => navigate('/shop?category=accessory')} className="hidden md:inline text-base md:text-lg font-medium text-gray-600 hover:text-black whitespace-nowrap">Accessory</button>
+          <CategoryDropdown />
         </div>
-        {/* Keep existing navbar search behavior (hide on /shop where page already has search/filters) */}
-        {showNavSearch && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              navigate(`/search?q=${encodeURIComponent(navQuery)}`);
-            }}
-            id="nav-search"
-            className="flex items-center w-full max-w-[520px]"
-            style={{ minWidth: 240 }}
-          >
-            <div style={{ position:'relative', width:'100%' }}>
-              <input
-                value={navQuery}
-                onChange={(e)=> setNavQuery(e.target.value)}
-                placeholder="Search for products..."
-                className="w-full bg-white border border-gray-300 rounded-2xl py-2.5 pl-4 pr-10 text-gray-600 placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-gray-400"
-              />
-              <button
-                type="submit"
-                aria-label="Search"
-                style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)' }}
-                className="text-gray-500 hover:text-black"
-              >
-                <Search size={18} />
-              </button>
-              {showSuggestions && (
-                <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-30">
-                  {suggestions.map((p) => (
-                    <button
-                      type="button"
-                      key={p.id}
-                      onClick={() => {
-                        navigate(`/product/${p.id}`);
-                        setShowSuggestions(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
-                    >
-                      <img src={p.image} alt={p.name} className="w-8 h-8 object-cover rounded" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden';}} />
-                      <span className="text-sm text-gray-700 truncate">{p.name}</span>
-                    </button>
-                  ))}
-                  <div className="border-t border-gray-100" />
-                  <button
-                    type="submit"
-                    className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                    onClick={() => setShowSuggestions(false)}
-                  >
-                    See all results for "{navQuery}"
-                  </button>
-                </div>
-              )}
-            </div>
-          </form>
-        )}
       </div>
       {/* Right: user chip + icons */}
       <div className="flex items-center space-x-6">
@@ -628,19 +548,25 @@ const App: React.FC = () => {
               <Routes>
                 <Route
                   path="/"
-                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} />}
+                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/')} />}
                 />
                 <Route
                   path="/home"
-                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} />}
+                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/home')} />}
                 />
                 <Route
                   path="/admin"
-                  element={(user && user.role === UserRole.ADMIN) ? (<AdminDashboard />) : (<LandingPage />)}
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <AdminDashboard />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/product/:id"
-                  element={<ProductDetails wishlist={wishlist} toggleWishlist={handleToggleWishlist} />}
+                  element={<ProductDetails wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth(`/product/${window.location.pathname.split('/').pop() || ''}`)} />}
                 />
                 <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route
@@ -656,13 +582,15 @@ const App: React.FC = () => {
                       setView={(view) => {
                         if (view === 'shop') window.location.href = '/shop';
                       }}
+                      user={user}
+                      onRequireAuth={() => requireAuth('/wishlist')}
                     />
                   }
                 />
                 <Route path="/cart" element={<CartPage user={user} />} />
-                <Route path="/search" element={<SearchPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} />} />
-                <Route path="/shop" element={<Shop wishlist={wishlist} toggleWishlist={handleToggleWishlist} />} />
-                <Route path="/new-arrivals" element={<NewArrivalsPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} />} />
+                <Route path="/search" element={<SearchPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/search')} />} />
+                <Route path="/shop" element={<Shop wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/shop')} />} />
+                <Route path="/new-arrivals" element={<NewArrivalsPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/new-arrivals')} />} />
                 <Route path="/orders" element={<OrdersPage user={user} onRequireAuth={requireAuth} />} />
                 <Route path="/payment" element={<PaymentPage user={user} onRequireAuth={requireAuth} />} />
               </Routes>

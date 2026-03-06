@@ -4,13 +4,16 @@ import { listenProducts } from '../services/firestoreService';
 import { Product } from '../types';
 import ProductCard from '../components/customer/ProductCard';
 import { useCart } from '../components/customer/CartContext';
+import { User } from '../types';
 
 type Props = {
   wishlist: string[];
   toggleWishlist: (id: string) => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
 };
 
-const NewArrivalsPage: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
+const NewArrivalsPage: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequireAuth }) => {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,8 @@ const NewArrivalsPage: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
               isWishlisted={wishlist.includes(p.id)}
               onToggleWishlist={toggleWishlist}
               variant="newArrivals"
+              user={user}
+              onRequireAuth={onRequireAuth}
             />
           </div>
         ))}

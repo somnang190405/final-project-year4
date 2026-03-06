@@ -5,13 +5,16 @@ import { Product } from '../types';
 import ProductCard from '../components/customer/ProductCard';
 import { useCart } from '../components/customer/CartContext';
 import { Search } from 'lucide-react';
+import { User } from '../types';
 
 type Props = {
   wishlist: string[];
   toggleWishlist: (id: string) => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
 };
 
-const SearchPage: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
+const SearchPage: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequireAuth }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -128,6 +131,8 @@ const SearchPage: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
               onAdd={(prod) => addToCart(prod)}
               isWishlisted={wishlist.includes(p.id)}
               onToggleWishlist={toggleWishlist}
+              user={user}
+              onRequireAuth={onRequireAuth}
             />
           </div>
         ))}

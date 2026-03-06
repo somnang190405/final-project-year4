@@ -6,10 +6,16 @@ import * as Types from '../types';
 import { useCart } from '../components/customer/CartContext';
 import { CheckCircle2, ChevronDown, Heart } from 'lucide-react';
 import { calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent } from '../services/pricing';
+import { User } from '../types';
 
-type Props = { wishlist?: string[]; toggleWishlist?: (id: string) => void };
+type Props = { 
+  wishlist?: string[]; 
+  toggleWishlist?: (id: string) => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
+};
 
-const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
+const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequireAuth }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<Types.Product | null>(null);
@@ -79,6 +85,10 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
   const imageSrc = (product as any).image || 'https://via.placeholder.com/800x1000?text=No+Image';
 
   const handleAdd = () => {
+    if (!user) {
+      onRequireAuth?.();
+      return;
+    }
     if (!product || stock <= 0) return;
     addToCart({
       ...product,
@@ -206,6 +216,10 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist }) => {
               aria-label="wishlist"
               type="button"
               onClick={() => {
+                if (!user) {
+                  onRequireAuth?.();
+                  return;
+                }
                 if (toggleWishlist && product) toggleWishlist(product.id);
                 setWishlisted((w) => !w);
               }}

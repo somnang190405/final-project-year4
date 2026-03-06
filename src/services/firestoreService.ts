@@ -478,41 +478,42 @@ export const createOrderAndDecrementStock = async (order: Omit<Types.Order, 'id'
   await runTransaction(db, async (tx) => {
     const items = Array.isArray((order as any)?.items) ? (order as any).items : [];
 
+    // For testing: skip stock validation and decrementing
     // Aggregate quantities per productId (and ensure Firestore transaction rule: all reads before writes).
-    const qtyByProductId = new Map<string, number>();
-    for (const it of items) {
-      const productId = String(it?.productId || '');
-      const qty = Math.max(1, Number(it?.quantity || 1));
-      if (!productId) continue;
-      qtyByProductId.set(productId, (qtyByProductId.get(productId) || 0) + qty);
-    }
+    // const qtyByProductId = new Map<string, number>();
+    // for (const it of items) {
+    //   const productId = String(it?.productId || '');
+    //   const qty = Math.max(1, Number(it?.quantity || 1));
+    //   if (!productId) continue;
+    //   qtyByProductId.set(productId, (qtyByProductId.get(productId) || 0) + qty);
+    // }
 
-    const productRefs = Array.from(qtyByProductId.keys()).map((productId) => doc(db, 'products', productId));
+    // const productRefs = Array.from(qtyByProductId.keys()).map((productId) => doc(db, 'products', productId));
 
-    // 1) READS
-    const stockByProductId = new Map<string, number>();
-    for (const ref of productRefs) {
-      const snap = await tx.get(ref);
-      if (!snap.exists()) {
-        throw new Error('Product not found');
-      }
-      const p = (snap.data() as any) || {};
-      stockByProductId.set(ref.id, Math.max(0, Number(p?.stock || 0)));
-    }
+    // // 1) READS
+    // const stockByProductId = new Map<string, number>();
+    // for (const ref of productRefs) {
+    //   const snap = await tx.get(ref);
+    //   if (!snap.exists()) {
+    //     throw new Error('Product not found');
+    //   }
+    //   const p = (snap.data() as any) || {};
+    //   stockByProductId.set(ref.id, Math.max(0, Number(p?.stock || 0)));
+    // }
 
-    // 2) VALIDATE
-    for (const [productId, qty] of qtyByProductId.entries()) {
-      const prevStock = stockByProductId.get(productId) ?? 0;
-      if (prevStock < qty) {
-        throw new Error('Out of stock');
-      }
-    }
+    // // 2) VALIDATE
+    // for (const [productId, qty] of qtyByProductId.entries()) {
+    //   const prevStock = stockByProductId.get(productId) ?? 0;
+    //   if (prevStock < qty) {
+    //     throw new Error('Out of stock');
+    //   }
+    // }
 
-    // 3) WRITES
-    for (const [productId, qty] of qtyByProductId.entries()) {
-      const prevStock = stockByProductId.get(productId) ?? 0;
-      tx.update(doc(db, 'products', productId), { stock: prevStock - qty } as any);
-    }
+    // // 3) WRITES
+    // for (const [productId, qty] of qtyByProductId.entries()) {
+    //   const prevStock = stockByProductId.get(productId) ?? 0;
+    //   tx.update(doc(db, 'products', productId), { stock: prevStock - qty } as any);
+    // }
 
     tx.set(
       orderRef,

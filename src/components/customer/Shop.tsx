@@ -6,11 +6,14 @@ import ProductCard from './ProductCard';
 import { listenProducts } from '../../services/firestoreService';
 import { Search as SearchIcon } from 'lucide-react';
 import { calcDiscountedUnitPrice, normalizePromotionPercent } from '../../services/pricing';
+import { User } from '../../types';
 
 type Props = {
   wishlist: string[];
   toggleWishlist: (id: string) => void;
   notify?: (msg: string, type: 'success' | 'error') => void;
+  user?: User | null;
+  onRequireAuth?: () => void;
 };
 
 type CategoryKey = 'ALL' | string;
@@ -18,17 +21,15 @@ type CategoryKey = 'ALL' | string;
 const canonCategory = (raw: string): string => {
   const s = String(raw || '').toLowerCase().trim();
   if (!s) return '';
-  // normalize common variations
-  if (s === 'bag') return 'bags';
-  if (s === 'bags') return 'bags';
-  if (s === 'accessories') return 'accessory';
-  if (s === 'accessory') return 'accessory';
-  if (s === 'shoe') return 'shoes';
-  if (s === 'shoes') return 'shoes';
+  // normalize to our fixed categories
+  if (s === 'men' || s === 'male' || s === 'man') return 'men';
+  if (s === 'women' || s === 'female' || s === 'woman') return 'women';
+  if (s === 'boy' || s === 'boys' || s === 'kid' || s === 'kids') return 'boy';
+  if (s === 'girl' || s === 'girls') return 'girl';
   return s;
 };
 
-const Shop = ({ wishlist, toggleWishlist }: Props) => {
+const Shop = ({ wishlist, toggleWishlist, user, onRequireAuth }: Props) => {
   const { addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('ALL');
@@ -54,28 +55,14 @@ const Shop = ({ wishlist, toggleWishlist }: Props) => {
   }, [location.search]);
 
   const categories: Array<{ key: CategoryKey; label: string }> = useMemo(() => {
-    const title = (s: string) => s.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, (m) => m.toUpperCase());
-    const prefOrder = ['women', 'men', 'shoes', 'bags', 'accessory'];
-    const set = new Map<string, string>();
-    for (const p of products) {
-      const raw = String(p.category || '').trim();
-      if (!raw) continue;
-      const key = canonCategory(raw);
-      if (!key) continue;
-      set.set(key, title(key));
-    }
-    const ordered = Array.from(set.entries())
-      .sort((a, b) => {
-        const ia = prefOrder.indexOf(a[0]);
-        const ib = prefOrder.indexOf(b[0]);
-        if (ia !== -1 && ib !== -1) return ia - ib;
-        if (ia !== -1) return -1;
-        if (ib !== -1) return 1;
-        return a[1].localeCompare(b[1]);
-      })
-      .map(([key, label]) => ({ key, label }));
-    return [{ key: 'ALL', label: 'All' }, ...ordered];
-  }, [products]);
+    return [
+      { key: 'ALL', label: 'All' },
+      { key: 'men', label: 'Men' },
+      { key: 'women', label: 'Women' },
+      { key: 'boy', label: 'Boy' },
+      { key: 'girl', label: 'Girl' }
+    ];
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -115,21 +102,6 @@ const Shop = ({ wishlist, toggleWishlist }: Props) => {
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <h1 className="text-4xl font-bold text-gray-900 mb-6">Shop Collection</h1>
-      {/* Top category pills for quick access */}
-      {categories.length > 1 && (
-        <div className="flex items-center gap-3 flex-wrap mb-8">
-          {categories.map((c) => (
-            <button
-              key={`pill-${c.key}`}
-              type="button"
-              onClick={() => setActiveCategory(c.key)}
-              className={c.key === activeCategory ? 'px-4 py-1.5 rounded-full bg-black text-white text-sm' : 'px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-sm text-gray-700'}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="grid grid-cols-[288px_minmax(0,1fr)] gap-10 overflow-x-auto">
         {/* Sidebar */}
@@ -179,27 +151,6 @@ const Shop = ({ wishlist, toggleWishlist }: Props) => {
               </div>
             </div>
 
-            <div>
-              <div className="text-[11px] font-semibold text-gray-500 tracking-widest uppercase mb-3">Categories</div>
-              <div className="space-y-2">
-                {categories.map((c) => {
-                  const active = c.key === activeCategory;
-                  return (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => setActiveCategory(c.key)}
-                      className="w-full flex items-center justify-between text-left py-1 bg-transparent border-0 outline-none focus:outline-none focus:ring-0"
-                    >
-                      <span className={active ? 'text-sm font-semibold text-gray-900' : 'text-sm text-gray-600 hover:text-gray-900'}>
-                        {c.label}
-                      </span>
-                      <span className={active ? 'w-1.5 h-1.5 rounded-full bg-gray-900' : 'w-1.5 h-1.5'} aria-hidden="true" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </aside>
 
@@ -219,6 +170,8 @@ const Shop = ({ wishlist, toggleWishlist }: Props) => {
                   textAlign="left"
                   pricePrefix="$"
                   elevated={false}
+                  user={user}
+                  onRequireAuth={onRequireAuth}
                 />
               </div>
             ))}

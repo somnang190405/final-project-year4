@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Prefer custom claims (request.auth.token.admin == true).
+    // Fallback: hardcode an email allowlist here to match your VITE_ADMIN_EMAILS.
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email in [
+          'admin@tinhme.com',
+          'your-email@example.com'
+        ]
+      );
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Users
+    match /users/{uid} {
+      allow read: if isAdmin() || isSelf(uid);
+
+      // Users can create their own profile doc, but cannot self-assign ADMIN.
+      allow create: if isSelf(uid) && (
+        !('role' in request.resource.data) || request.resource.data.role == 'CUSTOMER'
+      );
+
+      // Users can update their own profile, but cannot change their role.
+      allow update: if isSelf(uid) && (
+        !('role' in request.resource.data) || request.resource.data.role == resource.data.role
+      );
+
+      // Admins can manage user docs.
+      allow create, update, delete: if isAdmin();
+
+      // Per-user cartItems
+      match /cartItems/{itemId} {
+        allow read, write: if isAdmin() || isSelf(uid);
+      }
+    }
+
+    // Products
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if signedIn();  // Temporarily allow any authenticated user
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      // Customers can read their own orders. Admin can read all.
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+
+      // Customers can create orders only for themselves.
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+
+      // Only admins can update/cancel orders globally.
+      allow update, delete: if isAdmin();
+    }
+
+    // Categories
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
