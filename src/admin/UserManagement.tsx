@@ -22,7 +22,6 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="user-management-container">
-      <h2 className="um-title">User Management</h2>
       <div className="um-table card">
         <div className="um-row um-header">
           <span>User</span>

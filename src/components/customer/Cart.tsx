@@ -54,9 +54,12 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-lg text-gray-900 truncate">{item.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{item.category}</p>
-
-                    <div className="mt-4 inline-flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <div className="mt-1 text-sm text-gray-500 space-y-1">
+                      <div>{item.category} / {item.subcategory || 'Default'}</div>
+                      <div>Size: S</div>
+                      <div>Color: {item.colors && item.colors.length > 0 ? item.colors[0] : 'Default'}</div>
+                    </div>
+                    <div className="mt-3 inline-flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
                       <button
                         onClick={() => updateCartQty(item.id, Math.max(1, item.quantity - 1))}
                         className="px-3 py-2 hover:bg-gray-50 transition-colors"
@@ -86,6 +89,7 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                     return (
                       <>
                         <p className="font-semibold text-lg text-gray-900">${line.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Unit: ${unit.toFixed(2)}</p>
                         {hasPromo && (
                           <div className="mt-1 flex items-center justify-end gap-2">
                             <span className="text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded-md">-{formatPromotionPercentBadge(promo)}%</span>

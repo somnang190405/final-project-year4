@@ -106,7 +106,7 @@ const SalesReports: React.FC = () => {
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <div className="topbar">
         <div>
-          <div className="page-title">Sales Reports</div>
+          <div className="page-title">Sales report filters</div>
           <div className="metric-label" style={{ marginTop: 4 }}>
             Showing orders by paid date (fallback: order date)
           </div>

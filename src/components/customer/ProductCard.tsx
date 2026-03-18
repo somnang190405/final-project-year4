@@ -72,24 +72,23 @@ const ProductCard = ({
           -{formatPromotionPercentBadge(promo)}%
         </div>
       )}
-      <img 
-        src={product.image || "https://via.placeholder.com/300x400?text=No+Image"} 
-        data-src={product.image || "https://via.placeholder.com/300x400?text=No+Image"}
-        alt={product.name} 
-        loading="lazy"
-        decoding="async"
-        className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
-        onError={(e) => {
-          const img = e.currentTarget as HTMLImageElement;
-          const orig = img.getAttribute('data-src') || img.src;
-          if (!img.dataset.fallback) {
-            img.dataset.fallback = 'proxy';
-            img.src = `https://images.weserv.nl/?url=${encodeURIComponent(orig)}`;
-          } else {
-            img.src = "https://via.placeholder.com/300x400?text=No+Image";
-          }
-        }}
-      />
+      {product.image ? (
+        <img
+          src={product.image}
+          alt={product.name}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.style.display = 'none';
+          }}
+        />
+      ) : (
+        <div className="h-full w-full flex items-center justify-center text-xs text-gray-500 bg-gray-100">
+          No image
+        </div>
+      )}
       {showWishlistButton && (
         <div className="absolute top-3 right-3 z-20 opacity-100 transition-opacity duration-300 transform translate-y-0">
           <button

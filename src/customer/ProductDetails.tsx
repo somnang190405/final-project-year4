@@ -82,7 +82,7 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
   const promo = normalizePromotionPercent((product as any).promotionPercent);
   const hasPromo = hasValidPrice && promo > 0;
   const discountedPrice = calcDiscountedUnitPrice(basePrice, promo);
-  const imageSrc = (product as any).image || 'https://via.placeholder.com/800x1000?text=No+Image';
+  const imageSrc = (product as any).image || '';
 
   const handleAdd = () => {
     if (!user) {
@@ -106,24 +106,21 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
               -{formatPromotionPercentBadge(promo)}%
             </div>
           )}
-          <div className="aspect-[4/5] w-full">
-            <img
-              src={imageSrc}
-              data-src={imageSrc}
-              alt={product.name}
-              decoding="async"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                const orig = img.getAttribute('data-src') || img.src;
-                if (!img.dataset.fallback) {
-                  img.dataset.fallback = 'proxy';
-                  img.src = `https://images.weserv.nl/?url=${encodeURIComponent(orig)}`;
-                } else {
-                  img.src = 'https://via.placeholder.com/800x1000?text=No+Image';
-                }
-              }}
-            />
+          <div className="aspect-[4/5] w-full bg-gray-100 flex items-center justify-center">
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt={product.name}
+                decoding="async"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="text-sm text-slate-400">No image</div>
+            )}
           </div>
         </div>
 

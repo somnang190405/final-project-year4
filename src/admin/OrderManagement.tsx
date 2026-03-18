@@ -21,7 +21,6 @@ const OrderManagement: React.FC = () => {
 
   return (
     <div className="order-management-container">
-      <h2 className="om-title">Order Management</h2>
       <div className="om-table card">
         <div className="om-row om-header">
           <span>Order ID</span>

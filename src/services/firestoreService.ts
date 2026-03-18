@@ -85,8 +85,10 @@ export const uploadProductImage = async (file: File, productName: string): Promi
   // Lazy-load Firebase Storage so it doesn't bloat the initial customer bundle.
   const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
   const storage = getStorage(firebaseApp);
-  const safeName = productName.replace(/[^a-z0-9-_]/gi, '_').toLowerCase();
-  const imageRef = ref(storage, `products/${Date.now()}_${safeName}`);
+  const filename = file.name ? file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_') : 'image';
+  const base = productName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 30) || 'product';
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}-${filename}`;
+  const imageRef = ref(storage, `products/${unique}`);
   const metadata = {
     contentType: file.type || 'image/jpeg',
     cacheControl: 'public, max-age=31536000'
@@ -531,20 +533,31 @@ export const createOrderAndDecrementStock = async (order: Omit<Types.Order, 'id'
 };
 
 // Real-time orders listener for a specific user (more efficient than listening to all orders)
-export const listenOrdersByUser = (userId: string, cb: (orders: Types.Order[]) => void) => {
+export const listenOrdersByUser = (
+  userId: string,
+  cb: (orders: Types.Order[]) => void,
+  onError?: (error: Error) => void
+) => {
   const ordersCol = collection(db, 'orders');
   const q = query(ordersCol, where('userId', '==', userId));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs
-      .map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[];
-    // Sort client-side to avoid needing composite indexes and handle older docs without createdAt.
-    data.sort((a: any, b: any) => {
-      const ad = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.date || '')) ?? 0) as number;
-      const bd = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.date || '')) ?? 0) as number;
-      return bd - ad;
-    });
-    cb(data);
-  });
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const data = snapshot.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[];
+      data.sort((a: any, b: any) => {
+        const ad = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.date || '')) ?? 0) as number;
+        const bd = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.date || '')) ?? 0) as number;
+        return bd - ad;
+      });
+      cb(data);
+    },
+    (err) => {
+      console.error('Failed to listen orders:', err);
+      if (onError) onError(err as Error);
+      cb([]);
+    }
+  );
   return unsubscribe;
 };
 

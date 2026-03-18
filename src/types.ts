@@ -38,7 +38,8 @@ export interface Product {
   price: number;
   // Optional percent discount applied to `price` (0-100)
   promotionPercent?: number;
-  category: string;
+  category: string; // Main category: Men, Women, Girl, Boy
+  subcategory: string; // Subcategory under main category
   image: string;
   description: string;
   stock: number;

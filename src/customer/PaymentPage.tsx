@@ -53,6 +53,14 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const [transferReference, setTransferReference] = useState('');
   const [bankFormError, setBankFormError] = useState<string>('');
 
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAYPAL' | 'BANK' | 'QR'>('CARD');
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expMonth, setExpMonth] = useState('08');
+  const [expYear, setExpYear] = useState('2032');
+  const [cvv, setCvv] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+
   // Generate a payment QR when config allows. To avoid fake/static images,
   // we only render a QR generated from a KHQR base payload.
   useEffect(() => {
@@ -119,29 +127,33 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
     return `${m}:${String(r).padStart(2, '0')}`;
   }, [expiresAt, nowMs]);
 
-  const onPay = async (method: 'BANK' | 'QR') => {
+  const onPay = async (method: 'CARD' | 'PAYPAL' | 'BANK' | 'QR') => {
     console.log('Starting payment process...', { method, user: !!user, cartLength: cart.length, total });
 
+    if (method === 'CARD') {
+      if (!cardName.trim() || !cardNumber.trim() || !expMonth.trim() || !expYear.trim() || !cvv.trim()) {
+        setPaymentError('Please fill in card details before payment.');
+        return;
+      }
+      setPaymentError('');
+    }
+
     if (!user) {
-      console.error('Payment failed: No user authenticated');
       if (onRequireAuth) onRequireAuth('/payment');
       return;
     }
 
     if (!cart.length) {
-      console.error('Payment failed: Cart is empty');
       alert('Your cart is empty. Please add items before checkout.');
       return;
     }
 
     const ok = confirm('Confirm you have completed the payment?');
     if (!ok) {
-      console.log('Payment cancelled by user');
       return;
     }
 
     setBusy(true);
-    console.log('Payment processing started...');
 
     try {
       const nowIso = new Date().toISOString();
@@ -149,31 +161,25 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
       const accountLast4 = cleanAccount.length >= 4 ? cleanAccount.slice(-4) : '';
       const accountMasked = cleanAccount ? `****${accountLast4}` : '';
 
-      console.log('Creating order with data:', {
-        userId: user.id,
-        total,
-        itemCount: cart.length,
-        method
-      });
+      const paymentDetails: Record<string, unknown> = {};
+      if (method === 'CARD') {
+        paymentDetails.paymentType = 'Card';
+        paymentDetails.cardName = cardName.trim();
+        paymentDetails.cardLast4 = cardNumber.trim().slice(-4);
+      } else if (method === 'BANK') {
+        paymentDetails.paymentType = 'Bank';
+        if (bankName.trim()) paymentDetails.bankName = bankName.trim();
+        if (accountHolderName.trim()) paymentDetails.accountHolderName = accountHolderName.trim();
+        if (accountLast4) paymentDetails.accountLast4 = accountLast4;
+        if (accountMasked) paymentDetails.accountMasked = accountMasked;
+        if (transferReference.trim()) paymentDetails.transferReference = transferReference.trim();
+      } else if (method === 'QR') {
+        paymentDetails.paymentType = 'QR';
+      } else if (method === 'PAYPAL') {
+        paymentDetails.paymentType = 'PayPal';
+      }
 
-      try {
-        // Create payment details object, filtering out undefined/empty values
-        const paymentDetails = method === 'BANK' ? (() => {
-          const details: any = {};
-          const trimmedBankName = bankName.trim();
-          const trimmedAccountHolderName = accountHolderName.trim();
-          const trimmedTransferReference = transferReference.trim();
-
-          if (trimmedBankName) details.bankName = trimmedBankName;
-          if (trimmedAccountHolderName) details.accountHolderName = trimmedAccountHolderName;
-          if (accountLast4) details.accountLast4 = accountLast4;
-          if (accountMasked) details.accountMasked = accountMasked;
-          if (trimmedTransferReference) details.transferReference = trimmedTransferReference;
-
-          return Object.keys(details).length > 0 ? details : undefined;
-        })() : undefined;
-
-        await createOrderAndDecrementStock({
+      await createOrderAndDecrementStock({
         userId: user.id,
         date: nowIso,
         status: OrderStatus.PENDING,
@@ -191,34 +197,15 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
           quantity: i.quantity,
           image: i.image,
         })),
-        });
+      });
 
-        console.log('Order created successfully');
-
-      } catch (e: any) {
-        console.error('Order creation failed:', e);
-        const msg = String(e?.message || 'Payment could not be completed.');
-        alert(`Payment Error: ${msg}`);
-        return;
-      }
-
-      console.log('Clearing cart...');
       hydrateCart([]);
+      await clearUserCart(user.id);
 
-      try {
-        await clearUserCart(user.id);
-        console.log('User cart cleared successfully');
-      } catch (err) {
-        console.error('Failed to clear user cart:', err);
-        // Don't fail the payment for this
-      }
-
-      console.log('Payment completed successfully, navigating to orders...');
       navigate('/orders', { state: { toast: { message: 'Payment successful! Your order has been placed.', type: 'success' } } });
-
     } catch (error: any) {
-      console.error('Unexpected payment error:', error);
-      alert(`Unexpected error: ${error?.message || 'Unknown error occurred'}`);
+      console.error('Payment error:', error);
+      alert(`Payment error: ${error?.message || 'Something went wrong.'}`);
     } finally {
       setBusy(false);
     }
@@ -285,326 +272,130 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link to="/cart" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Cart
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-          <p className="text-gray-600 mt-2">Complete your purchase securely</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Payment Methods */}
-          <div className="space-y-8">
-            {/* QR Payment Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Scan to Pay</h3>
-                    <p className="text-sm text-gray-600">Pay securely with KHQR</p>
-                  </div>
+    <div className="min-h-screen bg-slate-50 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div className="grid grid-cols-1 xl:grid-cols-12">
+            <div className="xl:col-span-7 p-6 xl:p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-indigo-600 font-semibold">Checkout</p>
+                  <h1 className="mt-1 text-3xl font-bold text-slate-900">Complete your order</h1>
+                  <p className="mt-1 text-sm text-slate-500">Review your products and confirm payment.</p>
                 </div>
-
-                <div className="bg-gray-50 rounded-xl p-6 mb-6">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500 mb-2">Merchant</div>
-                    <div className="font-semibold text-gray-900 mb-4">{paymentCfg.displayMerchantName}</div>
-
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <span className="text-4xl font-bold text-gray-900">{fmtNumber(total)}</span>
-                      <span className="text-lg text-gray-500">USD</span>
-                    </div>
-
-                    {qrDataUrl ? (
-                      <div className="bg-white rounded-xl p-4 shadow-sm inline-block">
-                        <img
-                          src={qrDataUrl}
-                          alt="Payment QR Code"
-                          className="w-48 h-48 object-contain"
-                          onError={(e) => {
-                            const img = e.currentTarget as HTMLImageElement;
-                            img.src = 'https://via.placeholder.com/192x192?text=QR';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-48 h-48 bg-white rounded-xl shadow-sm flex items-center justify-center mx-auto">
-                        <div className="text-center">
-                          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
-                          <div className="text-sm text-gray-500">{qrError || 'Generating QR...'}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {qrDataUrl && (
-                      <div className="mt-4 text-center">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm font-medium">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                          </svg>
-                          KHQR Verified
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500">Order total</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{fmtMoney(total)}</p>
                 </div>
-
-                <div className="text-center">
-                  <div className="text-sm text-gray-500 mb-2">QR Code expires in</div>
-                  <div className="text-2xl font-bold text-gray-900">{expiresText}</div>
-                </div>
-
-                {paymentCfg.abaKhqrBasePayload && qrDataUrl && (
-                  <div className="mt-4 text-xs text-gray-400 text-center">
-                    KHQR generated with dynamic amount
-                  </div>
-                )}
-
-                {qrDataUrl && (
-                  <div className="mt-6">
-                    <button
-                      type="button"
-                      className="w-full py-4 px-6 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors"
-                      onClick={() => onPay('QR')}
-                      disabled={busy}
-                    >
-                      {busy ? 'Processing...' : 'I Have Completed the QR Payment'}
-                    </button>
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* Bank Transfer Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Bank Transfer</h3>
-                    <p className="text-sm text-gray-600">Pay directly from your bank account</p>
-                  </div>
+              <div className="rounded-2xl border border-slate-200 bg-white">
+                <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-100">
+                  <div className="col-span-5">Product</div>
+                  <div className="col-span-2 text-center">Size</div>
+                  <div className="col-span-2 text-center">Qty</div>
+                  <div className="col-span-3 text-right">Total Price</div>
                 </div>
-
-                {!showBankForm ? (
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      className="w-full py-4 px-6 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold hover:border-gray-300 hover:bg-gray-50 transition-all"
-                      onClick={() => setShowBankForm(true)}
-                      disabled={busy}
-                    >
-                      {busy ? 'Processing...' : 'Enter Bank Details'}
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full py-3 px-6 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm"
-                      onClick={() => onPay('BANK')}
-                      disabled={busy}
-                    >
-                      {busy ? 'Processing...' : 'Skip Bank Details (Test)'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-400 focus:ring-0 transition-colors"
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          placeholder="e.g. ABA Bank"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-400 focus:ring-0 transition-colors"
-                          value={accountHolderName}
-                          onChange={(e) => setAccountHolderName(e.target.value)}
-                          placeholder="Name on bank account"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-400 focus:ring-0 transition-colors"
-                          value={accountNumber}
-                          onChange={(e) => setAccountNumber(e.target.value)}
-                          placeholder="Enter account number"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Account Number</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-400 focus:ring-0 transition-colors"
-                          value={confirmAccountNumber}
-                          onChange={(e) => setConfirmAccountNumber(e.target.value)}
-                          placeholder="Re-enter account number"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Transfer Reference <span className="text-gray-400">(optional)</span>
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-400 focus:ring-0 transition-colors"
-                          value={transferReference}
-                          onChange={(e) => setTransferReference(e.target.value)}
-                          placeholder="e.g. ABA TXN123456"
-                        />
-                      </div>
-                    </div>
-
-                    {bankFormError && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                          </svg>
-                          <span className="text-sm text-red-700">{bankFormError}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className="flex-1 py-3 px-6 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
-                        onClick={() => setShowBankForm(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1 py-3 px-6 rounded-xl bg-black text-white font-semibold hover:bg-gray-900 transition-colors"
-                        onClick={onConfirmBankPayment}
-                        disabled={busy}
-                      >
-                        {busy ? 'Processing...' : 'Confirm Payment'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Order Summary */}
-          <div className="lg:sticky lg:top-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Order Summary</h2>
-
-                {/* Order Items */}
-                <div className="space-y-4 mb-6">
+                <div className="space-y-2 p-3">
                   {cart.map((item) => {
                     const discountedPrice = calcDiscountedUnitPrice(item.price, item.promotionPercent);
-                    const itemTotal = discountedPrice * item.quantity;
                     return (
-                      <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                        <div className="w-16 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0">
+                      <div key={item.id} className="grid grid-cols-12 gap-3 items-center rounded-xl border border-slate-100 p-2 bg-slate-50">
+                        <div className="col-span-5 flex items-center gap-2">
                           {item.image ? (
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {(e.currentTarget as HTMLImageElement).style.visibility = 'hidden';}}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                              No image
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 truncate">{item.name}</h4>
-                          <div className="text-sm text-gray-600">
-                            Quantity: {item.quantity} × ${discountedPrice.toFixed(2)}
+                        <img className="w-11 h-11 rounded-lg object-cover" key={item.id} src={item.image} alt={item.name} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                      ) : (
+                        <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400">No image</div>
+                      )}
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{item.name}</div>
+                            <div className="text-xs text-slate-500">{item.brand || 'Brand'}</div>
                           </div>
-                          {(item.promotionPercent ?? 0) > 0 && (
-                            <div className="text-xs text-green-600 font-medium">
-                              {formatPromotionPercentBadge(item.promotionPercent ?? 0)}
-                            </div>
-                          )}
                         </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-gray-900">${itemTotal.toFixed(2)}</div>
-                        </div>
+                        <div className="col-span-2 text-center text-sm text-slate-700">{item.size || 'Free'}</div>
+                        <div className="col-span-2 text-center text-sm text-slate-700">{item.quantity}</div>
+                        <div className="col-span-3 text-right text-sm font-semibold text-slate-900">{fmtMoney(discountedPrice * item.quantity)}</div>
                       </div>
                     );
                   })}
                 </div>
+              </div>
 
-                {/* Price Breakdown */}
-                <div className="border-t border-gray-100 pt-6 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium text-gray-900">{fmtMoney(originalSubtotal)}</span>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex justify-between text-sm text-slate-600">
+                  <div>Subtotal</div>
+                  <div>{fmtMoney(originalSubtotal)}</div>
+                </div>
+                {discountTotal > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-700">
+                    <div>Discount</div>
+                    <div>-{fmtMoney(discountTotal)}</div>
                   </div>
+                )}
+                <div className="flex justify-between text-sm text-slate-600">
+                  <div>Shipping</div>
+                  <div>{fmtMoney(0)}</div>
+                </div>
+                <div className="mt-2 border-t border-slate-200 pt-2 flex justify-between text-base font-bold text-slate-900">
+                  <div>Total</div>
+                  <div>{fmtMoney(total)}</div>
+                </div>
+              </div>
+            </div>
 
-                  {discountTotal > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-green-600">Discount</span>
-                      <span className="font-medium text-green-600">-{fmtMoney(discountTotal)}</span>
-                    </div>
-                  )}
+            <div className="xl:col-span-5 border-l border-slate-200 bg-slate-50 p-6 xl:p-8">
+              <div className="mb-5">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Payment Info</p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-900">Payment Method</h2>
+                <p className="text-sm text-slate-500">Choose a secure way to pay with your card.</p>
+              </div>
 
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Processing Fee</span>
-                    <span className="font-medium text-gray-900">{fmtMoney(fee)}</span>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-3 mt-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-bold text-gray-900">Total</span>
-                      <span className="text-2xl font-bold text-gray-900">{fmtMoney(total)}</span>
-                    </div>
-                  </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                <div className="flex flex-col gap-2 mb-3">
+                  <label className="rounded-xl border border-slate-200 p-2 cursor-pointer flex items-center gap-2">
+                    <input type="radio" checked={paymentMethod === 'CARD'} onChange={() => setPaymentMethod('CARD')} className="form-radio text-indigo-600" />
+                    <span className="text-sm font-medium text-slate-700">Credit Card</span>
+                  </label>
+                  <label className="rounded-xl border border-slate-200 p-2 cursor-pointer flex items-center gap-2">
+                    <input type="radio" checked={paymentMethod === 'PAYPAL'} onChange={() => setPaymentMethod('PAYPAL')} className="form-radio text-indigo-600" />
+                    <span className="text-sm font-medium text-slate-700">PayPal</span>
+                  </label>
                 </div>
 
-                {/* Payment Instructions */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
+                <div className="mt-3 space-y-2 text-sm text-slate-600">
+                  <label className="block">Name on Card</label>
+                  <input value={cardName} onChange={(e) => setCardName(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500" placeholder="John Doe" />
+                  <label className="block">Card Number</label>
+                  <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500" placeholder="**** **** **** 1234" />
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <h4 className="font-semibold text-blue-900 mb-1">Secure Payment</h4>
-                      <p className="text-sm text-blue-700">
-                        Your payment information is encrypted and secure. Complete your payment using either QR code scanning or bank transfer.
-                      </p>
+                      <label className="block text-xs text-slate-500">Exp. Month</label>
+                      <input value={expMonth} onChange={(e) => setExpMonth(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-2 py-2 outline-none focus:border-indigo-500" placeholder="08" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500">Exp. Year</label>
+                      <input value={expYear} onChange={(e) => setExpYear(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-2 py-2 outline-none focus:border-indigo-500" placeholder="2032" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500">CVV</label>
+                      <input value={cvv} onChange={(e) => setCvv(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-2 py-2 outline-none focus:border-indigo-500" placeholder="243" />
                     </div>
                   </div>
                 </div>
+
+                {paymentError && <div className="mt-3 text-xs text-red-600">{paymentError}</div>}
+                {qrError && paymentMethod === 'QR' && <div className="mt-3 text-xs text-red-600">{qrError}</div>}
+
+                <button
+                  type="button"
+                  onClick={() => onPay(paymentMethod)}
+                  disabled={busy}
+                  className="mt-4 w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+                >
+                  {busy ? 'Processing...' : 'Pay Now'}
+                </button>
+
+                <p className="mt-3 text-xs text-slate-500">By continuing, you agree to our Terms and Conditions.</p>
               </div>
             </div>
           </div>
