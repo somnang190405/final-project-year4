@@ -28,12 +28,30 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequi
   const arrivals = useMemo(() => products.filter(p => !!p.isNewArrival), [products]);
   const heroSlides = useMemo(() => {
     if (arrivals.length) {
-      return arrivals.map(p => ({ id: p.id, img: p.image, title: p.name, cta: 'Shop Now' }));
+      return arrivals.map(p => ({
+        id: p.id,
+        img: p.image,
+        title: p.name,
+        subtitle: `${p.category} · ${p.subcategory}`,
+        cta: 'Shop Now',
+      }));
     }
     // Fallback slides if no new arrivals yet
     return [
-      { id: 'fallback-1', img: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1600&q=80', title: 'Redefine Your Style.', cta: 'Shop Now' },
-      { id: 'fallback-2', img: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1500&q=80', title: 'Jackets for the Modern Man', cta: 'Discover Now' },
+      {
+        id: 'fallback-1',
+        img: 'https://images.unsplash.com/photo-1483985988355-763728e1935?auto=format&fit=crop&w=1600&q=80',
+        title: 'Redefine Your Style',
+        subtitle: 'Modern streetwear essentials',
+        cta: 'Shop Now',
+      },
+      {
+        id: 'fallback-2',
+        img: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1500&q=80',
+        title: 'Jackets for the Modern Man',
+        subtitle: 'Stay warm without losing style',
+        cta: 'Discover Now',
+      },
     ];
   }, [arrivals]);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -105,20 +123,33 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequi
           touchX.current = null;
         }}
       >
-        <img className="hero-bg-img" src={heroSlides[heroIndex].img} alt="hero" 
-          onError={(e)=>{
+        <img
+          className="hero-bg-img"
+          src={heroSlides[heroIndex].img}
+          alt={heroSlides[heroIndex].title}
+          onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             const orig = heroSlides[heroIndex].img;
-            if (!img.dataset.fallback) { img.dataset.fallback='proxy'; img.src = `https://images.weserv.nl/?url=${encodeURIComponent(orig)}`; }
+            if (!img.dataset.fallback) {
+              img.dataset.fallback = 'proxy';
+              img.src = `https://images.weserv.nl/?url=${encodeURIComponent(orig)}`;
+            }
           }}
         />
+        <div className="hero-overlay" />
         <div className="hero-content">
+          <span className="hero-label">{heroSlides[heroIndex].subtitle}</span>
           <h1 className="hero-title">{heroSlides[heroIndex].title}</h1>
-          <button className="hero-btn" onClick={() => {
-            const slide = heroSlides[heroIndex];
-            if (slide.id && slide.id.startsWith('fallback')) navigate('/shop');
-            else navigate(`/product/${slide.id}`);
-          }}>{heroSlides[heroIndex].cta}</button>
+          <button
+            className="hero-btn"
+            onClick={() => {
+              const slide = heroSlides[heroIndex];
+              if (slide.id && slide.id.startsWith('fallback')) navigate('/shop');
+              else navigate(`/product/${slide.id}`);
+            }}
+          >
+            {heroSlides[heroIndex].cta}
+          </button>
         </div>
         <button aria-label="Prev" className="hero-arrow left" onClick={prevHero}>‹</button>
         <button aria-label="Next" className="hero-arrow right" onClick={nextHero}>›</button>

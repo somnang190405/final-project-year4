@@ -22,6 +22,19 @@ const AdminDashboard: React.FC = () => {
   };
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
+  const filteredProducts = React.useMemo(() => {
+    const normalizedSearch = productSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return products;
+    }
+    return products.filter((product) =>
+      [product.name, product.category, product.subcategory, product.description]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch)
+    );
+  }, [products, productSearchTerm]);
   const [activeView, setActiveView] = useState<"dashboard" | "products" | "orders" | "users" | "sales">("dashboard");
 
   // Product management state
@@ -41,6 +54,7 @@ const AdminDashboard: React.FC = () => {
   const [imageMode, setImageMode] = useState<'url' | 'upload'>('url');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageFileName, setImageFileName] = useState<string>("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addProductStep, setAddProductStep] = useState<1 | 2 | 3>(1);
@@ -85,6 +99,18 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (imageMode !== 'upload' || !imageFile) {
+      setImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [imageMode, imageFile]);
+
+  useEffect(() => {
     const unsubCategories = listenCategories((cats) => setCategories(cats.map(c => c.name)));
     return () => {
       unsubCategories && unsubCategories();
@@ -126,35 +152,91 @@ const AdminDashboard: React.FC = () => {
     return blob;
   };
 
-  // Upload image to Firebase Storage
+  // Upload image to Firebase Storage with improved error handling
   const uploadToStorage = async (file: File): Promise<string> => {
-    const compressedBlob = await downscaleImage(file);
-    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`;
-    const storageRef = ref(storage, `products/${uniqueName}`);
-    const uploadTask = uploadBytesResumable(storageRef, compressedBlob, {
-      contentType: file.type || 'image/jpeg',
-      cacheControl: 'public, max-age=31536000',
-    });
+    try {
+      // Validate file
+      if (!file) {
+        throw new Error('No file selected');
+      }
 
-    return new Promise((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error('Image upload failed:', error);
-          setUploadProgress(null);
-          reject(error);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(downloadURL);
-        }
-      );
-    });
+      // Check file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error(`Invalid file type. Allowed types: ${validTypes.join(', ')}`);
+      }
+
+      // Check file size (5MB max before compression)
+      const maxSizeMB = 5;
+      if (file.size > maxSizeMB * 1024 * 1024) {
+        throw new Error(`File size exceeds ${maxSizeMB}MB limit`);
+      }
+
+      console.log('Starting image upload...', { fileName: file.name, fileSize: file.size, fileType: file.type });
+
+      // Compress image
+      const compressedBlob = await downscaleImage(file);
+      console.log('Image compressed:', { compressedSize: compressedBlob.size });
+
+      // Create safe filename
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`;
+      const storageRef = ref(storage, `products/${uniqueName}`);
+
+      console.log('Uploading to Firebase Storage...', { storageRef: storageRef.fullPath });
+
+      const uploadTask = uploadBytesResumable(storageRef, compressedBlob, {
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+      });
+
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log('Upload progress:', { progress, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+            setUploadProgress(progress);
+          },
+          (error: any) => {
+            console.error('Image upload failed:', {
+              code: error.code,
+              message: error.message,
+              details: error
+            });
+            setUploadProgress(null);
+
+            // Provide user-friendly error messages
+            let errorMsg = 'Failed to upload image. ';
+            if (error.code === 'storage/unauthorized') {
+              errorMsg += 'You do not have permission to upload images. Please contact an administrator.';
+            } else if (error.code === 'storage/canceled') {
+              errorMsg += 'Upload was canceled.';
+            } else if (error.code === 'storage/unknown') {
+              errorMsg += 'An unknown error occurred. Please check your internet connection and try again.';
+            } else {
+              errorMsg += error.message || 'Unknown error';
+            }
+
+            reject(new Error(errorMsg));
+          },
+          async () => {
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              console.log('Upload successful:', { downloadURL });
+              resolve(downloadURL);
+            } catch (error: any) {
+              console.error('Failed to get download URL:', error);
+              reject(new Error('Upload completed but failed to get image URL: ' + error.message));
+            }
+          }
+        );
+      });
+    } catch (error: any) {
+      console.error('Upload preprocessing error:', error);
+      setUploadProgress(null);
+      throw error;
+    }
   };
 
   // Handle delete product
@@ -340,7 +422,9 @@ const AdminDashboard: React.FC = () => {
       <aside className="admin-sidebar light">
         <div className="brand">
           <span className="brand-icon" aria-hidden="true"><ShieldCheck size={18} /></span>
-          <span className="brand-name">TinhMe Dashboard</span>
+          <button type="button" onClick={goHome} className="brand-name brand-button" style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>
+            Back Home
+          </button>
         </div>
         <nav className="side-nav">
           <button className={`nav-item ${activeView === "dashboard" ? "active" : ""}`} onClick={() => setActiveView("dashboard")}>
@@ -374,15 +458,6 @@ const AdminDashboard: React.FC = () => {
             {activeView === "users" && "User Management"}
             {activeView === "sales" && "Sales Reports"}
           </h1>
-          <button
-            type="button"
-            className="secondary-btn back-home-btn"
-            onClick={goHome}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 500 }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center' }}><Home size={18} aria-hidden="true" /></span>
-            <span>Back Home</span>
-          </button>
         </header>
 
         {activeView === "dashboard" && (
@@ -421,8 +496,18 @@ const AdminDashboard: React.FC = () => {
         {activeView === "products" && (
           <section className="products-section">
             <div className="section-header">
-              <h2 className="section-title">Product Catalog</h2>
+              <div>
+                <h2 className="section-title">Manage Products</h2>
+                <p className="section-subtitle">Search and manage inventory with filters and quick actions.</p>
+              </div>
               <div className="section-header-actions">
+                <input
+                  type="search"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  placeholder="Search products by name, category or subcategory"
+                  className="search-input"
+                />
                 <button
                   className="primary-btn add-product-btn"
                   onClick={() => {
@@ -452,7 +537,11 @@ const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="empty-state">No products match your search.</td>
+                    </tr>
+                  ) : filteredProducts.map((product) => (
                     <tr key={product.id}>
                       <td>
                         {product.image ? (
@@ -641,28 +730,17 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="input-row">
-                      <div className="form-group">
-                        <label className="form-label">Category</label>
-                        <input
-                          type="text"
-                          className="input"
-                          value={newProduct.category}
-                          disabled
-                          style={{ backgroundColor: '#f9fafb', cursor: 'not-allowed' }}
-                        />
+                    <div className="form-section">
+                      <div className="form-section-title">Category selection</div>
+                      <div className="selected-tags">
+                        <span className="tag">
+                          <strong>Category:</strong> {newProduct.category || 'Not selected'}
+                        </span>
+                        <span className="tag">
+                          <strong>Subcategory:</strong> {newProduct.subcategory || 'Not selected'}
+                        </span>
                       </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Subcategory</label>
-                        <input
-                          type="text"
-                          className="input"
-                          value={newProduct.subcategory}
-                          disabled
-                          style={{ backgroundColor: '#f9fafb', cursor: 'not-allowed' }}
-                        />
-                      </div>
+                      <p className="section-note">If you need to change the category, use the back button at the top.</p>
                     </div>
 
                     <div className="form-group">
@@ -687,7 +765,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="input-row">
+                    <div className="form-row form-row--spaced">
                       <div className="form-group">
                         <label className="form-label">Promotion %</label>
                         <input
@@ -697,7 +775,9 @@ const AdminDashboard: React.FC = () => {
                           className="input"
                           value={newProduct.promotionPercent}
                           onChange={(e) => setNewProduct(prev => ({ ...prev, promotionPercent: parseFloat(e.target.value) || 0 }))}
+                          placeholder="0"
                         />
+                        <p className="section-note">Leave as 0 if there is no discount.</p>
                       </div>
 
                       <div className="form-group">
@@ -707,8 +787,9 @@ const AdminDashboard: React.FC = () => {
                             checked={newProduct.isNewArrival}
                             onChange={(e) => setNewProduct(prev => ({ ...prev, isNewArrival: e.target.checked }))}
                           />
-                          New Arrival
+                          Feature on New Arrivals
                         </label>
+                        <p className="section-note">This product will appear in the New Arrivals section of the shop.</p>
                       </div>
                     </div>
 
@@ -758,32 +839,46 @@ const AdminDashboard: React.FC = () => {
                       </div>
 
                       {imageMode === 'url' ? (
-                        <input
-                          type="url"
-                          className="input"
-                          value={newProduct.image}
-                          onChange={(e) => setNewProduct(prev => ({ ...prev, image: e.target.value }))}
-                          placeholder="https://example.com/image.jpg"
-                        />
-                      ) : (
-                        <div className="file-upload">
+                        <>
                           <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              setImageFile(file);
-                              setImageFileName(file?.name || "");
-                            }}
+                            type="url"
+                            className="input"
+                            value={newProduct.image}
+                            onChange={(e) => setNewProduct(prev => ({ ...prev, image: e.target.value }))}
+                            placeholder="https://example.com/image.jpg"
                           />
-                          {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
-                          {uploadProgress !== null && (
-                            <div className="upload-progress">
-                              <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
-                              <span>{Math.round(uploadProgress)}%</span>
+                          {newProduct.image && (
+                            <div className="image-preview-container">
+                              <img src={newProduct.image} alt="Image preview" className="image-preview" />
                             </div>
                           )}
-                        </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="file-upload">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setImageFile(file);
+                                setImageFileName(file?.name || "");
+                              }}
+                            />
+                            {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
+                            {uploadProgress !== null && (
+                              <div className="upload-progress">
+                                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+                                <span>{Math.round(uploadProgress)}%</span>
+                              </div>
+                            )}
+                          </div>
+                          {imagePreviewUrl && (
+                            <div className="image-preview-container">
+                              <img src={imagePreviewUrl} alt="Upload preview" className="image-preview" />
+                            </div>
+                          )}
+                        </>
                       )}
                       {formErrors.image && <span className="field-error">{formErrors.image}</span>}
                     </div>

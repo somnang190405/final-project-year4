@@ -72,7 +72,7 @@ export interface Order {
   status: OrderStatus;
   // Payment tracking (optional for backward compatibility)
   paymentStatus?: 'UNPAID' | 'PAID';
-  paymentMethod?: 'QR' | 'BANK';
+  paymentMethod?: 'QR' | 'BANK' | 'CARD' | 'PAYPAL';
   paidAt?: string; // ISO timestamp
   paymentDetails?: {
     // Store only non-sensitive or masked details.

@@ -98,6 +98,22 @@ export const uploadProductImage = async (file: File, productName: string): Promi
   return url;
 };
 
+export const uploadUserAvatar = async (file: File, userId: string): Promise<string> => {
+  const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+  const storage = getStorage(firebaseApp);
+  const filename = file.name ? file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_') : 'avatar';
+  const base = userId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 30) || 'user';
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}-${filename}`;
+  const imageRef = ref(storage, `avatars/${unique}`);
+  const metadata = {
+    contentType: file.type || 'image/jpeg',
+    cacheControl: 'public, max-age=31536000'
+  } as any;
+  const snapshot = await uploadBytes(imageRef, file, metadata);
+  const url = await getDownloadURL(snapshot.ref);
+  return url;
+};
+
 // Create product with image file upload
 export const createProductWithUpload = async (
   data: Omit<Types.Product, 'id' | 'image'>,

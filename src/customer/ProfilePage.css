@@ -1,5 +1,27 @@
 /* Customer/Admin unified Profile page styles */
 
+.profile-header-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 28px;
+  padding: 32px 28px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+  margin-bottom: 32px;
+}
+
+.profile-page-title {
+  font-size: 2.5rem;
+  line-height: 1.05;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.profile-page-subtitle {
+  font-size: 1rem;
+  color: #4b5563;
+}
+
 .profile-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -32,6 +54,11 @@
   border: 4px solid #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   margin-bottom: 12px;
+  transition: transform 0.3s ease;
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
 }
 
 .profile-name {
@@ -60,6 +87,7 @@
   border: 1px solid #e5e7eb;
   background: #fff;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .profile-nav button.active,
@@ -89,6 +117,9 @@
   font-size: 12px;
   color: #6b7280;
   margin-bottom: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .profile-field input,
@@ -98,6 +129,99 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #f9fafb;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.profile-field input:focus,
+.profile-field select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.profile-field input:hover,
+.profile-field select:hover {
+  border-color: #d1d5db;
+}
+
+/* Animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.profile-card {
+  animation: slideInUp 0.5s ease-out;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+    margin: 16px auto;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-field {
+    width: 100%;
+  }
+}
+
+/* Button Hover States */
+button {
+  transition: all 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Input Focus States */
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Success/Error message styling */
+.profile-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  animation: fadeIn 0.3s ease;
+}
+
+.profile-message.success {
+  background: #d1fae5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.profile-message.error {
+  background: #fee2e2;
+  color: #7f1d1d;
+  border-left: 4px solid #ef4444;
 }
 
 .profile-actions {
@@ -108,17 +232,39 @@
 }
 
 .btn {
-  padding: 10px 16px;
-  border-radius: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
   border: 1px solid #e5e7eb;
   background: #fff;
   cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.12);
 }
 
 .btn-primary {
-  background: #f97316; /* orange-500 */
+  background: #7c3aed; /* purple-600 */
   color: white;
-  border-color: #f97316;
+  border-color: #7c3aed;
+}
+
+.btn-primary:hover {
+  background: #6d28d9;
+  border-color: #6d28d9;
+}
+
+.btn-secondary {
+  background: #f9fafb;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.btn-secondary:hover {
+  background: #f3f4f6;
 }
 
 .status-row {

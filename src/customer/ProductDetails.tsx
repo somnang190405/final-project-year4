@@ -97,8 +97,8 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="grid grid-cols-[minmax(420px,1fr)_minmax(380px,520px)] gap-10 overflow-x-auto">
+    <div className="w-full mx-auto px-6 py-12">
+      <div className="grid grid-cols-[minmax(420px,1fr)_1fr] gap-10">
         {/* Left: Image */}
         <div className="w-full bg-gray-100 rounded-2xl overflow-hidden relative">
           {hasPromo && (
