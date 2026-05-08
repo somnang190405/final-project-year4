@@ -56,6 +56,7 @@ const AdminDashboard: React.FC = () => {
   const [imageFileName, setImageFileName] = useState<string>("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addProductStep, setAddProductStep] = useState<1 | 2 | 3>(1);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -127,9 +128,9 @@ const AdminDashboard: React.FC = () => {
     const createBitmap = (f: File) => (window as any).createImageBitmap ? (createImageBitmap as any)(f) : Promise.reject('no-bitmap');
     const bitmap = await createBitmap(file).catch(async () => {
       const url = URL.createObjectURL(file);
-      return new Promise<ImageBitmap>((resolve, reject) => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve({ width: img.width, height: img.height } as any);
+        img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = url;
       });
@@ -137,7 +138,7 @@ const AdminDashboard: React.FC = () => {
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
-    const { width, height } = bitmap;
+    const { width, height } = bitmap as any;
     const scale = Math.min(maxEdge / width, maxEdge / height, 1);
     canvas.width = width * scale;
     canvas.height = height * scale;
@@ -218,6 +219,7 @@ const AdminDashboard: React.FC = () => {
               errorMsg += error.message || 'Unknown error';
             }
 
+            setUploadError(errorMsg);
             reject(new Error(errorMsg));
           },
           async () => {
@@ -233,8 +235,10 @@ const AdminDashboard: React.FC = () => {
         );
       });
     } catch (error: any) {
+      const message = error?.message || 'Failed to process upload.';
       console.error('Upload preprocessing error:', error);
       setUploadProgress(null);
+      setUploadError(message);
       throw error;
     }
   };
@@ -317,9 +321,11 @@ const AdminDashboard: React.FC = () => {
       setSelectedSubcategory("");
       setToast({ message: "Product created successfully!", type: "success" });
       setTimeout(() => setToast(null), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating product:", error);
-      setToast({ message: "Failed to create product. Please try again.", type: "error" });
+      const message = error?.message || "Failed to create product. Please try again.";
+      setUploadError(message);
+      setToast({ message, type: "error" });
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
@@ -379,9 +385,11 @@ const AdminDashboard: React.FC = () => {
       setUploadProgress(null);
       setToast({ message: "Product updated successfully!", type: "success" });
       setTimeout(() => setToast(null), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating product:", error);
-      setToast({ message: "Failed to update product. Please try again.", type: "error" });
+      const message = error?.message || "Failed to update product. Please try again.";
+      setUploadError(message);
+      setToast({ message, type: "error" });
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
@@ -861,8 +869,10 @@ const AdminDashboard: React.FC = () => {
                               accept="image/*"
                               onChange={(e) => {
                                 const file = e.target.files?.[0] || null;
+                                setImageMode('upload');
                                 setImageFile(file);
                                 setImageFileName(file?.name || "");
+                                setFormErrors(prev => ({ ...prev, image: undefined }));
                               }}
                             />
                             {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
@@ -873,6 +883,7 @@ const AdminDashboard: React.FC = () => {
                               </div>
                             )}
                           </div>
+                          {uploadError && <div className="upload-error-banner">{uploadError}</div>}
                           {imagePreviewUrl && (
                             <div className="image-preview-container">
                               <img src={imagePreviewUrl} alt="Upload preview" className="image-preview" />
@@ -1099,24 +1110,29 @@ const AdminDashboard: React.FC = () => {
                     placeholder="https://example.com/image.jpg"
                   />
                 ) : (
-                  <div className="file-upload">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        setImageFile(file);
-                        setImageFileName(file?.name || "");
-                      }}
-                    />
-                    {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
-                    {uploadProgress !== null && (
-                      <div className="upload-progress">
-                        <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
-                        <span>{Math.round(uploadProgress)}%</span>
-                      </div>
-                    )}
-                  </div>
+                  <>
+                    <div className="file-upload">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setEditImageMode('upload');
+                          setImageFile(file);
+                          setImageFileName(file?.name || "");
+                          setUploadError(null);
+                        }}
+                      />
+                      {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
+                      {uploadProgress !== null && (
+                        <div className="upload-progress">
+                          <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+                          <span>{Math.round(uploadProgress)}%</span>
+                        </div>
+                      )}
+                    </div>
+                    {uploadError && <div className="upload-error-banner">{uploadError}</div>}
+                  </>
                 )}
                 {formErrors.image && <span className="error">{formErrors.image}</span>}
               </div>

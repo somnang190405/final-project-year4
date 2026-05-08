@@ -16,6 +16,9 @@ const firebaseConfig = {
 
 // Initialize Firebase
 export const firebaseApp = initializeApp(firebaseConfig);
+if (!firebaseConfig.storageBucket || !firebaseConfig.storageBucket.includes('appspot.com')) {
+  console.warn('Firebase storage bucket may be misconfigured:', firebaseConfig.storageBucket);
+}
 export const auth = getAuth(firebaseApp);
 // Firestore: enable offline persistence (IndexedDB) so reads can be served from cache
 // and writes can be queued while offline.

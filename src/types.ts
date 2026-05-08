@@ -65,6 +65,14 @@ export interface OrderItem {
   image: string;
 }
 
+export interface OrderReturnRequest {
+  status: 'Requested' | 'Approved' | 'Declined' | 'Completed';
+  customerComment?: string;
+  adminComment?: string;
+  requestedAt?: string;
+  updatedAt?: string;
+}
+
 export interface Order {
   id: string;
   userId: string;
@@ -82,6 +90,7 @@ export interface Order {
     accountMasked?: string;
     transferReference?: string;
   };
+  returnRequest?: OrderReturnRequest;
   total: number;
   items: OrderItem[];
 }

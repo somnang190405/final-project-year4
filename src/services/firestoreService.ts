@@ -643,6 +643,40 @@ export const updateOrderStatus = async (id: string, status: string) => {
   });
 };
 
+export const requestOrderReturn = async (orderId: string, customerComment: string) => {
+  const orderRef = doc(db, 'orders', orderId);
+  const orderSnap = await getDoc(orderRef);
+  const existing = orderSnap.exists() ? (orderSnap.data() as any) : {};
+  const previousReturn = existing.returnRequest || {};
+
+  await updateDoc(orderRef, {
+    returnRequest: {
+      ...previousReturn,
+      status: 'Requested',
+      customerComment: customerComment.trim(),
+      requestedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+  } as any);
+};
+
+export const updateOrderReturnRequest = async (orderId: string, status: 'Approved' | 'Declined' | 'Completed', adminComment?: string) => {
+  const orderRef = doc(db, 'orders', orderId);
+  const orderSnap = await getDoc(orderRef);
+  const existing = orderSnap.exists() ? (orderSnap.data() as any) : {};
+
+  const previousReturn = existing.returnRequest || {};
+
+  await updateDoc(orderRef, {
+    returnRequest: {
+      ...previousReturn,
+      status,
+      adminComment: adminComment?.trim() || previousReturn.adminComment,
+      updatedAt: serverTimestamp(),
+    },
+  } as any);
+};
+
 // Get sales reports (example: return all orders for now)
 export const getSalesReports = async (): Promise<any[]> => {
   // You can aggregate or filter as needed for real reports

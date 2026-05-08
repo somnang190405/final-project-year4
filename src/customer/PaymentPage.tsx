@@ -7,15 +7,29 @@ import { calcCartTotals, calcDiscountedUnitPrice, formatPromotionPercentBadge, n
 import { getPaymentConfig } from '../services/paymentConfig';
 import QRCode from 'qrcode';
 import { buildAbaKhqrPayload } from '../services/abaKhqr';
-import { Check } from 'lucide-react';
+import { Check, CreditCard, QrCode, Banknote, ShieldCheck } from 'lucide-react';
 
 type Props = {
   user: User | null;
   onRequireAuth?: (redirectTo: string) => void;
 };
 
+type PaymentMethodType = 'CARD' | 'PAYPAL' | 'BANK' | 'QR';
+
 const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 const fmtNumber = (n: number) => n.toFixed(2);
+
+const paymentMethodsMeta: Array<{
+  id: PaymentMethodType;
+  label: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'CARD', label: 'Credit Card', desc: 'Visa, Mastercard, Amex', icon: CreditCard },
+  { id: 'PAYPAL', label: 'PayPal', desc: 'Fast and secure', icon: ShieldCheck },
+  { id: 'QR', label: 'QR Code', desc: 'ABA KHQR payment', icon: QrCode },
+  { id: 'BANK', label: 'Bank Transfer', desc: 'Direct transfer to ABA', icon: Banknote },
+];
 
 // Step Progress Indicator
 const StepProgressIndicator: React.FC<{ currentStep: number }> = ({ currentStep }) => {
@@ -89,7 +103,6 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const [expiresAt, setExpiresAt] = useState<number>(() => Date.now() + 3 * 60 * 1000);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
-  const [showBankForm, setShowBankForm] = useState(false);
   const [bankName, setBankName] = useState('');
   const [accountHolderName, setAccountHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -97,7 +110,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const [transferReference, setTransferReference] = useState('');
   const [bankFormError, setBankFormError] = useState<string>('');
 
-  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PAYPAL' | 'BANK' | 'QR'>('CARD');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('CARD');
   const [cardName, setCardName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expMonth, setExpMonth] = useState('08');
@@ -384,43 +397,63 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
 
             {/* Payment Method Selection */}
             <div className="bg-white rounded-2xl p-6 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold">2</span>
                 Payment Method
               </h2>
+              <p className="text-sm text-gray-500 mb-6 max-w-2xl">
+                Choose your preferred payment option below, then complete the form and tap submit to finalize your order.
+              </p>
 
               {/* Tab-style payment method selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {[
-                  { id: 'CARD', label: '💳 Credit Card', desc: 'Visa, Mastercard' },
-                  { id: 'PAYPAL', label: '🅿️ PayPal', desc: 'Fast & Secure' },
-                  { id: 'QR', label: '📱 QR Code', desc: 'ABA KHQR' },
-                  { id: 'BANK', label: '🏦 Bank Transfer', desc: 'Direct Transfer' },
-                ].map((method: any) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setPaymentMethod(method.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      paymentMethod === method.id
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-gray-900">{method.label}</div>
-                    <div className="text-xs text-gray-500">{method.desc}</div>
-                  </button>
-                ))}
+                {paymentMethodsMeta.map((method) => {
+                  const Icon = method.icon;
+                  const selected = paymentMethod === method.id;
+                  return (
+                    <button
+                      key={method.id}
+                      onClick={() => setPaymentMethod(method.id)}
+                      className={`group p-5 rounded-3xl border-2 transition-all text-left shadow-sm ${
+                        selected
+                          ? 'border-indigo-600 bg-indigo-50/80 shadow-indigo-200'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${selected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          <Icon className="w-5 h-5" />
+                        </span>
+                        <div>
+                          <div className="font-semibold text-gray-900">{method.label}</div>
+                          <div className="text-sm text-gray-500">{method.desc}</div>
+                        </div>
+                      </div>
+                      {selected && <div className="mt-4 text-sm text-indigo-600 font-medium">Selected</div>}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Payment form - Credit Card */}
               {paymentMethod === 'CARD' && (
-                <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
+                <div className="space-y-4 bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm">
+                  <div className="rounded-3xl bg-white p-5 border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Credit Card Details</h3>
+                        <p className="text-sm text-gray-500">Securely enter your card information to process payment.</p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">Secure</span>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Name on Card</label>
                     <input 
                       value={cardName} 
                       onChange={(e) => setCardName(e.target.value)} 
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" 
                       placeholder="John Doe" 
                     />
                   </div>
@@ -452,7 +485,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     type="button"
                     onClick={() => onPay('CARD')}
                     disabled={busy || !isFormValid()}
-                    className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {busy ? 'Processing...' : `Pay ${fmtMoney(total)} with Card`}
                   </button>
@@ -461,17 +494,16 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
 
               {/* PayPal description and action */}
               {paymentMethod === 'PAYPAL' && (
-                <div className="bg-gray-50 p-6 rounded-xl space-y-4">
-                  <div>
-                    <p className="text-gray-700 text-base">
-                      You have selected PayPal. Click the button below to simulate checkout and confirm your payment.
-                    </p>
+                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                  <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                    <div className="text-base font-semibold text-gray-900">PayPal Checkout</div>
+                    <p className="text-sm text-gray-500">You will be redirected to PayPal to complete your payment securely.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onPay('PAYPAL')}
                     disabled={busy}
-                    className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {busy ? 'Processing...' : `Pay ${fmtMoney(total)} with PayPal`}
                   </button>
@@ -480,15 +512,13 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
 
               {/* QR Code Display */}
               {paymentMethod === 'QR' && (
-                <div className="bg-gray-50 p-6 rounded-xl">
+                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
                   <div className="text-center">
                     {qrDataUrl ? (
                       <div className="flex flex-col items-center">
-                        <img src={qrDataUrl} alt="ABA KHQR Payment Code" className="w-48 h-48 border-4 border-white rounded-lg shadow-lg mb-4" />
-                        <div className="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-lg font-semibold mb-3">
-                          Expires in: {expiresText}
-                        </div>
-                        <p className="text-sm text-gray-600">Scan this QR code with your ABA mobile app to pay {fmtMoney(total)}</p>
+                        <img src={qrDataUrl} alt="ABA KHQR Payment Code" className="w-52 h-52 border-4 border-white rounded-3xl shadow-xl mb-4" />
+                        <div className="rounded-full bg-indigo-100 text-indigo-800 px-4 py-2 font-semibold mb-3">Expires in: {expiresText}</div>
+                        <p className="text-sm text-gray-600">Scan the QR code using your ABA mobile app to pay {fmtMoney(total)} instantly.</p>
                       </div>
                     ) : (
                       <div className="py-8">
@@ -496,20 +526,24 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                       </div>
                     )}
                   </div>
-                <button
-                  type="button"
-                  onClick={() => onPay('QR')}
-                  disabled={busy || !qrDataUrl}
-                  className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  {busy ? 'Processing...' : `Confirm QR payment of ${fmtMoney(total)}`}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => onPay('QR')}
+                    disabled={busy || !qrDataUrl}
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {busy ? 'Processing...' : `Confirm QR payment of ${fmtMoney(total)}`}
+                  </button>
+                </div>
               )}
 
               {/* Bank Transfer Form */}
               {paymentMethod === 'BANK' && (
-                <div className="bg-gray-50 p-6 rounded-xl space-y-4">
+                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                  <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                    <div className="text-base font-semibold text-gray-900">Bank Transfer Details</div>
+                    <p className="text-sm text-gray-500">After confirming, transfer the total amount to the account and keep your reference.</p>
+                  </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Bank Name</label>
                     <input value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" placeholder="e.g., ABA" />
@@ -535,7 +569,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     type="button"
                     onClick={onConfirmBankPayment}
                     disabled={busy}
-                    className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {busy ? 'Processing...' : `Confirm Bank Transfer of ${fmtMoney(total)}`}
                   </button>
@@ -577,7 +611,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                 onClick={() => onPay(paymentMethod)}
                 disabled={busy || !isFormValid()}
                 title={!isFormValid() ? 'Please fill in all required fields' : ''}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 hover:disabled:scale-100 mb-4 flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 hover:disabled:scale-100 mb-4 flex items-center justify-center gap-2"
               >
                 {busy ? (
                   <>
@@ -596,7 +630,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
 
               <Link
                 to="/shop"
-                className="w-full py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:border-gray-400 transition text-center block"
+                className="w-full py-3 rounded-3xl border-2 border-gray-300 text-gray-700 font-semibold hover:border-gray-400 transition text-center block"
               >
                 Continue Shopping
               </Link>
@@ -607,6 +641,17 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 px-4 pb-4 pt-3 bg-white border-t border-gray-200 shadow-xl">
+        <button
+          type="button"
+          onClick={() => onPay(paymentMethod)}
+          disabled={busy || !isFormValid()}
+          className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          {busy ? 'Processing Payment...' : isFormValid() ? `Submit Payment - ${fmtMoney(total)}` : 'Complete required fields'}
+        </button>
       </div>
     </div>
   );
