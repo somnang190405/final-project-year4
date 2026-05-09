@@ -237,7 +237,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                             />
                           </div>
                           {returnError && <p className="text-sm text-red-600">{returnError}</p>}
-                          <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row">
                             <button
                               type="button"
                               onClick={async () => {
@@ -259,9 +259,9 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                                 }
                               }}
                               disabled={returnBusy}
-                              className="rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-indigo-400/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex-1 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-indigo-400/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {returnBusy ? 'Submitting...' : 'Submit return request'}
+                              {returnBusy ? 'Submitting...' : '✓ Submit Return'}
                             </button>
                             <button
                               type="button"
@@ -270,7 +270,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                                 setReturnComment('');
                                 setReturnError('');
                               }}
-                              className="rounded-3xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                              className="flex-1 rounded-3xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
                             >
                               Cancel
                             </button>
