@@ -17,7 +17,7 @@ const AdminDashboard: React.FC = () => {
     try {
       navigate('/');
     } catch (e) {
-      try { window.location.href = '/'; } catch {}
+      try { window.location.href = '/'; } catch { }
     }
   };
   const [products, setProducts] = useState<Product[]>([]);
@@ -65,6 +65,10 @@ const AdminDashboard: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [newColorInput, setNewColorInput] = useState<string>("");
+  const [editColorInput, setEditColorInput] = useState<string>("");
+  const [colorInputError, setColorInputError] = useState<string | null>(null);
+  const [editColorInputError, setEditColorInputError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>(["Men", "Women", "Shoes", "Bags", "Accessory"]);
   const [formErrors, setFormErrors] = useState<{ name?: string; price?: string; stock?: string; category?: string; subcategory?: string; image?: string }>({});
   const [editImageMode, setEditImageMode] = useState<'url' | 'upload'>('url');
@@ -425,6 +429,57 @@ const AdminDashboard: React.FC = () => {
     setNewProduct(prev => ({ ...prev, subcategory: "" }));
   };
 
+  const isValidHexColor = (value: string) => /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value.trim());
+
+  const updateColorSelection = (color: string, target: 'new' | 'edit') => {
+    const normalizedColor = color.trim();
+    if (!isValidHexColor(normalizedColor)) {
+      if (target === 'new') setColorInputError('Enter a valid hex code like #FF0000');
+      else setEditColorInputError('Enter a valid hex code like #FF0000');
+      return;
+    }
+
+    const currentColors = target === 'new' ? newProduct.colors || [] : editTarget?.colors || [];
+    if (currentColors.includes(normalizedColor)) {
+      if (target === 'new') setColorInputError('This color is already selected');
+      else setEditColorInputError('This color is already selected');
+      return;
+    }
+
+    if (currentColors.length >= 3) {
+      if (target === 'new') setColorInputError('You can choose up to 3 colors');
+      else setEditColorInputError('You can choose up to 3 colors');
+      return;
+    }
+
+    if (target === 'new') {
+      setNewProduct(prev => ({ ...prev, colors: [...(prev.colors || []), normalizedColor] }));
+      setNewColorInput('');
+      setColorInputError(null);
+    } else if (editTarget) {
+      setEditTarget(prev => prev ? { ...prev, colors: [...(prev.colors || []), normalizedColor] } : null);
+      setEditColorInput('');
+      setEditColorInputError(null);
+    }
+  };
+
+  const removeColor = (color: string, target: 'new' | 'edit') => {
+    if (target === 'new') {
+      setNewProduct(prev => ({ ...prev, colors: (prev.colors || []).filter(c => c !== color) }));
+    } else if (editTarget) {
+      setEditTarget(prev => prev ? { ...prev, colors: (prev.colors || []).filter(c => c !== color) } : null);
+    }
+  };
+
+  const toggleColor = (color: string, target: 'new' | 'edit') => {
+    const currentColors = target === 'new' ? newProduct.colors || [] : editTarget?.colors || [];
+    if (currentColors.includes(color)) {
+      removeColor(color, target);
+      return;
+    }
+    updateColorSelection(color, target);
+  };
+
   return (
     <div className="admin-dashboard-root light">
       <aside className="admin-sidebar light">
@@ -553,17 +608,17 @@ const AdminDashboard: React.FC = () => {
                     <tr key={product.id}>
                       <td>
                         {product.image ? (
-                        <img 
-                          src={product.image}
-                          alt={product.name}
-                          className="table-image"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="table-image flex items-center justify-center bg-gray-100 text-xs text-gray-500">No image</div>
-                      )}
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="table-image"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="table-image flex items-center justify-center bg-gray-100 text-xs text-gray-500">No image</div>
+                        )}
                       </td>
                       <td className="product-name-cell">{product.name}</td>
                       <td>{product.category}</td>
@@ -647,9 +702,9 @@ const AdminDashboard: React.FC = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
-                {addProductStep === 1 ? "Select Main Category" : 
-                 addProductStep === 2 ? "Select Subcategory" : 
-                 "Add New Product"}
+                {addProductStep === 1 ? "Select Main Category" :
+                  addProductStep === 2 ? "Select Subcategory" :
+                    "Add New Product"}
               </h3>
               {(addProductStep === 2 || addProductStep === 3) && (
                 <button
@@ -753,6 +808,21 @@ const AdminDashboard: React.FC = () => {
 
                     <div className="form-group">
                       <label className="form-label">Colors</label>
+                      <div className="selected-colors-row">
+                        <div className="color-chip-list">
+                          {newProduct.colors?.length ? newProduct.colors.map((color) => (
+                            <div key={color} className="color-chip">
+                              <span className="color-chip-swatch" style={{ backgroundColor: color }} />
+                              <span>{color}</span>
+                              <button type="button" className="color-chip-remove" onClick={() => removeColor(color, 'new')} aria-label={`Remove ${color}`}>
+                                ×
+                              </button>
+                            </div>
+                          )) : (
+                            <span className="section-note">Select or add up to 3 colors.</span>
+                          )}
+                        </div>
+                      </div>
                       <div className="color-selection">
                         {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'].map((color) => (
                           <button
@@ -760,17 +830,28 @@ const AdminDashboard: React.FC = () => {
                             type="button"
                             className={`color-option ${newProduct.colors?.includes(color) ? 'selected' : ''}`}
                             style={{ backgroundColor: color }}
-                            onClick={() => {
-                              const colors = newProduct.colors || [];
-                              if (colors.includes(color)) {
-                                setNewProduct(prev => ({ ...prev, colors: colors.filter(c => c !== color) }));
-                              } else {
-                                setNewProduct(prev => ({ ...prev, colors: [...colors, color] }));
-                              }
-                            }}
+                            onClick={() => toggleColor(color, 'new')}
                           />
                         ))}
                       </div>
+                      <div className="color-input-row">
+                        <input
+                          type="text"
+                          className="input color-code-input"
+                          value={newColorInput}
+                          onChange={(e) => {
+                            setNewColorInput(e.target.value);
+                            setColorInputError(null);
+                          }}
+                          placeholder="#FF0000"
+                          maxLength={7}
+                        />
+                        <button type="button" className="button button-secondary add-color-button" onClick={() => updateColorSelection(newColorInput, 'new')}>
+                          Add color
+                        </button>
+                      </div>
+                      {colorInputError && <span className="field-error">{colorInputError}</span>}
+                      <p className="section-note">Enter a color code or click one of the swatches. Maximum 3 colors.</p>
                     </div>
 
                     <div className="form-row form-row--spaced">
@@ -812,86 +893,36 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Image *</label>
-                      <div className="image-input-options">
-                        <label>
-                          <input
-                            type="radio"
-                            value="url"
-                            checked={imageMode === 'url'}
-                            onChange={(e) => {
-                              setImageMode(e.target.value as 'url' | 'upload');
-                              if (e.target.value === 'url') {
-                                setImageFile(null);
-                                setImageFileName("");
-                                setUploadProgress(null);
-                              }
-                            }}
-                          />
-                          Image URL
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            value="upload"
-                            checked={imageMode === 'upload'}
-                            onChange={(e) => {
-                              setImageMode(e.target.value as 'url' | 'upload');
-                              if (e.target.value === 'upload') {
-                                setNewProduct(prev => ({ ...prev, image: "" }));
-                              }
-                            }}
-                          />
-                          Upload File
-                        </label>
+                      <label className="form-label">Image URL *</label>
+
+                      <div className="image-input-container">
+                        <input
+                          type="url"
+                          className="input"
+                          value={newProduct.image}
+                          onChange={(e) =>
+                            setNewProduct((prev) => ({ ...prev, image: e.target.value }))
+                          }
+                          placeholder="https://example.com/image.jpg"
+                        />
+
+                        {/* Show preview only if a URL is entered */}
+                        {newProduct.image && (
+                          <div className="image-preview-container">
+                            <img
+                              src={newProduct.image}
+                              alt="Image preview"
+                              className="image-preview"
+                              // Optional: handle broken links
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      {imageMode === 'url' ? (
-                        <>
-                          <input
-                            type="url"
-                            className="input"
-                            value={newProduct.image}
-                            onChange={(e) => setNewProduct(prev => ({ ...prev, image: e.target.value }))}
-                            placeholder="https://example.com/image.jpg"
-                          />
-                          {newProduct.image && (
-                            <div className="image-preview-container">
-                              <img src={newProduct.image} alt="Image preview" className="image-preview" />
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div className="file-upload">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0] || null;
-                                setImageMode('upload');
-                                setImageFile(file);
-                                setImageFileName(file?.name || "");
-                                setFormErrors(prev => ({ ...prev, image: undefined }));
-                              }}
-                            />
-                            {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
-                            {uploadProgress !== null && (
-                              <div className="upload-progress">
-                                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
-                                <span>{Math.round(uploadProgress)}%</span>
-                              </div>
-                            )}
-                          </div>
-                          {uploadError && <div className="upload-error-banner">{uploadError}</div>}
-                          {imagePreviewUrl && (
-                            <div className="image-preview-container">
-                              <img src={imagePreviewUrl} alt="Upload preview" className="image-preview" />
-                            </div>
-                          )}
-                        </>
+                      {formErrors.image && (
+                        <span className="field-error">{formErrors.image}</span>
                       )}
-                      {formErrors.image && <span className="field-error">{formErrors.image}</span>}
                     </div>
                   </div>
                 </form>
@@ -965,204 +996,227 @@ const AdminDashboard: React.FC = () => {
                     onChange={(e) => setEditTarget(prev => prev ? { ...prev, name: e.target.value } : null)}
                     required
                   />
-                {formErrors.name && <span className="error">{formErrors.name}</span>}
-              </div>
-
-              <div className="form-group">
-                <label>Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editTarget.price}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
-                  required
-                />
-                {formErrors.price && <span className="error">{formErrors.price}</span>}
-              </div>
-
-              <div className="form-group">
-                <label>Promotion %</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={editTarget.promotionPercent}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, promotionPercent: parseFloat(e.target.value) || 0 } : null)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Stock *</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editTarget.stock}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
-                  required
-                />
-                {formErrors.stock && <span className="error">{formErrors.stock}</span>}
-              </div>
-
-              <div className="form-group">
-                <label>Category *</label>
-                <select
-                  value={editTarget.category}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, category: e.target.value } : null)}
-                  required
-                >
-                  <option value="">Select category</option>
-                  {mainCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                {formErrors.category && <span className="error">{formErrors.category}</span>}
-              </div>
-
-              <div className="form-group">
-                <label>Subcategory *</label>
-                <select
-                  value={editTarget.subcategory}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, subcategory: e.target.value } : null)}
-                  required
-                >
-                  <option value="">Select subcategory</option>
-                  {editTarget.category && subcategories[editTarget.category]?.map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-                {formErrors.subcategory && <span className="error">{formErrors.subcategory}</span>}
-              </div>
-
-              <div className="form-group">
-                <label>Colors</label>
-                <div className="color-selection">
-                  {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`color-option ${editTarget.colors?.includes(color) ? 'selected' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => {
-                        setEditTarget(prev => {
-                          if (!prev) return null;
-                          const colors = prev.colors || [];
-                          if (colors.includes(color)) {
-                            return { ...prev, colors: colors.filter(c => c !== color) };
-                          } else {
-                            return { ...prev, colors: [...colors, color] };
-                          }
-                        });
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  value={editTarget.description}
-                  onChange={(e) => setEditTarget(prev => prev ? { ...prev, description: e.target.value } : null)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Image *</label>
-                <div className="image-input-options">
-                  <label>
-                    <input
-                      type="radio"
-                      value="url"
-                      checked={editImageMode === 'url'}
-                      onChange={(e) => {
-                        setEditImageMode(e.target.value as 'url' | 'upload');
-                        if (e.target.value === 'url') {
-                          setImageFile(null);
-                          setImageFileName("");
-                          setUploadProgress(null);
-                        }
-                      }}
-                    />
-                    Image URL
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      value="upload"
-                      checked={editImageMode === 'upload'}
-                      onChange={(e) => {
-                        setEditImageMode(e.target.value as 'url' | 'upload');
-                        if (e.target.value === 'upload') {
-                          setEditTarget(prev => prev ? { ...prev, image: "" } : prev);
-                        }
-                      }}
-                    />
-                    Upload File
-                  </label>
+                  {formErrors.name && <span className="error">{formErrors.name}</span>}
                 </div>
 
-                {editImageMode === 'url' ? (
+                <div className="form-group">
+                  <label>Price *</label>
                   <input
-                    type="url"
-                    value={editTarget.image}
-                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, image: e.target.value } : null)}
-                    placeholder="https://example.com/image.jpg"
+                    type="number"
+                    step="0.01"
+                    value={editTarget.price}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
+                    required
                   />
-                ) : (
-                  <>
-                    <div className="file-upload">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          setEditImageMode('upload');
-                          setImageFile(file);
-                          setImageFileName(file?.name || "");
-                          setUploadError(null);
-                        }}
-                      />
-                      {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
-                      {uploadProgress !== null && (
-                        <div className="upload-progress">
-                          <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
-                          <span>{Math.round(uploadProgress)}%</span>
+                  {formErrors.price && <span className="error">{formErrors.price}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Promotion %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editTarget.promotionPercent}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, promotionPercent: parseFloat(e.target.value) || 0 } : null)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Stock *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editTarget.stock}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
+                    required
+                  />
+                  {formErrors.stock && <span className="error">{formErrors.stock}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Category *</label>
+                  <select
+                    value={editTarget.category}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, category: e.target.value } : null)}
+                    required
+                  >
+                    <option value="">Select category</option>
+                    {mainCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  {formErrors.category && <span className="error">{formErrors.category}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Subcategory *</label>
+                  <select
+                    value={editTarget.subcategory}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, subcategory: e.target.value } : null)}
+                    required
+                  >
+                    <option value="">Select subcategory</option>
+                    {editTarget.category && subcategories[editTarget.category]?.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                  {formErrors.subcategory && <span className="error">{formErrors.subcategory}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Colors</label>
+                  <div className="selected-colors-row">
+                    <div className="color-chip-list">
+                      {editTarget?.colors?.length ? editTarget.colors.map((color) => (
+                        <div key={color} className="color-chip">
+                          <span className="color-chip-swatch" style={{ backgroundColor: color }} />
+                          <span>{color}</span>
+                          <button type="button" className="color-chip-remove" onClick={() => removeColor(color, 'edit')} aria-label={`Remove ${color}`}>
+                            ×
+                          </button>
                         </div>
+                      )) : (
+                        <span className="section-note">Select or add up to 3 colors.</span>
                       )}
                     </div>
-                    {uploadError && <div className="upload-error-banner">{uploadError}</div>}
-                  </>
-                )}
-                {formErrors.image && <span className="error">{formErrors.image}</span>}
-              </div>
+                  </div>
+                  <div className="color-selection">
+                    {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-option ${editTarget?.colors?.includes(color) ? 'selected' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => editTarget && toggleColor(color, 'edit')}
+                      />
+                    ))}
+                  </div>
+                  <div className="color-input-row">
+                    <input
+                      type="text"
+                      className="input color-code-input"
+                      value={editColorInput}
+                      onChange={(e) => {
+                        setEditColorInput(e.target.value);
+                        setEditColorInputError(null);
+                      }}
+                      placeholder="#FF0000"
+                      maxLength={7}
+                    />
+                    <button type="button" className="button button-secondary add-color-button" onClick={() => updateColorSelection(editColorInput, 'edit')}>
+                      Add color
+                    </button>
+                  </div>
+                  {editColorInputError && <span className="field-error">{editColorInputError}</span>}
+                  <p className="section-note">Enter a color code or click one of the swatches. Maximum 3 colors.</p>
+                </div>
 
-              <div className="form-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={editTarget.isNewArrival}
-                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, isNewArrival: e.target.checked } : null)}
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={editTarget.description}
+                    onChange={(e) => setEditTarget(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    rows={3}
                   />
-                  Mark as New Arrival
-                </label>
-              </div>
+                </div>
 
-              <div className="modal-footer">
-                <button type="button" className="secondary-btn" onClick={() => {
-                  setShowEditModal(false);
-                  setEditTarget(null);
-                  setImageFile(null);
-                  setImageFileName("");
-                  setUploadProgress(null);
-                }}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary-btn" disabled={saving}>
-                  {saving ? "Updating..." : "Update Product"}
-                </button>
-              </div>
-            </form>
+                <div className="form-group">
+                  <label>Image *</label>
+                  <div className="image-input-options">
+                    <label>
+                      <input
+                        type="radio"
+                        value="url"
+                        checked={editImageMode === 'url'}
+                        onChange={(e) => {
+                          setEditImageMode(e.target.value as 'url' | 'upload');
+                          if (e.target.value === 'url') {
+                            setImageFile(null);
+                            setImageFileName("");
+                            setUploadProgress(null);
+                          }
+                        }}
+                      />
+                      Image URL
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        value="upload"
+                        checked={editImageMode === 'upload'}
+                        onChange={(e) => {
+                          setEditImageMode(e.target.value as 'url' | 'upload');
+                          if (e.target.value === 'upload') {
+                            setEditTarget(prev => prev ? { ...prev, image: "" } : prev);
+                          }
+                        }}
+                      />
+                      Upload File
+                    </label>
+                  </div>
+
+                  {editImageMode === 'url' ? (
+                    <input
+                      type="url"
+                      value={editTarget.image}
+                      onChange={(e) => setEditTarget(prev => prev ? { ...prev, image: e.target.value } : null)}
+                      placeholder="https://example.com/image.jpg"
+                    />
+                  ) : (
+                    <>
+                      <div className="file-upload">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setEditImageMode('upload');
+                            setImageFile(file);
+                            setImageFileName(file?.name || "");
+                            setUploadError(null);
+                          }}
+                        />
+                        {imageFileName && <div className="file-name">Selected file: {imageFileName}</div>}
+                        {uploadProgress !== null && (
+                          <div className="upload-progress">
+                            <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+                            <span>{Math.round(uploadProgress)}%</span>
+                          </div>
+                        )}
+                      </div>
+                      {uploadError && <div className="upload-error-banner">{uploadError}</div>}
+                    </>
+                  )}
+                  {formErrors.image && <span className="error">{formErrors.image}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={editTarget.isNewArrival}
+                      onChange={(e) => setEditTarget(prev => prev ? { ...prev, isNewArrival: e.target.checked } : null)}
+                    />
+                    Mark as New Arrival
+                  </label>
+                </div>
+
+                <div className="modal-footer">
+                  <button type="button" className="secondary-btn" onClick={() => {
+                    setShowEditModal(false);
+                    setEditTarget(null);
+                    setImageFile(null);
+                    setImageFileName("");
+                    setUploadProgress(null);
+                  }}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-btn" disabled={saving}>
+                    {saving ? "Updating..." : "Update Product"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
