@@ -176,57 +176,16 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
       <div className="max-w-4xl mx-auto px-4">
         <div className="profile-header-card mb-8">
           <div>
-            <h1 className="profile-page-title">Your Profile</h1>
+            <h3 className="profile-page-title">Your Profile</h3>
             <p className="profile-page-subtitle">Update your account information and keep your profile current.</p>
           </div>
         </div>
 
-        {/* Avatar Upload Section */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-bold">📸</span>
-            Profile Picture
-          </h2>
-          
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            {/* Avatar Preview */}
-            <div className="relative">
-              <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
-                ) : (
-                  <svg className="w-16 h-16 text-white opacity-50" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                  </svg>
-                )}
-              </div>
-              <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-indigo-600 text-white p-3 rounded-full cursor-pointer hover:bg-indigo-700 transition-colors shadow-lg">
-                <Camera className="w-5 h-5" />
-              </label>
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-              />
-            </div>
-
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{form.firstName || 'Your Name'}</h3>
-              <p className="text-gray-600 mb-4">{form.email}</p>
-              <label htmlFor="avatar-upload" className="inline-block px-6 py-3 bg-indigo-50 text-indigo-600 font-semibold rounded-xl hover:bg-indigo-100 transition-colors cursor-pointer">
-                {avatarFile ? 'Change Photo' : 'Upload Photo'}
-              </label>
-              <p className="text-sm text-gray-500 mt-4">JPG, PNG or GIF. Max 5MB.</p>
-            </div>
-          </div>
-        </div>
 
         {/* Section 1: Basic Information */}
         <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm">1</span>
+            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">1</span>
             Basic Information
           </h2>
           
@@ -277,7 +236,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
         {/* Section 2: Contact Information */}
         <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm">2</span>
+            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">2</span>
             Contact Information
           </h2>
 
@@ -311,7 +270,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
             className="w-full px-8 py-6 flex items-center justify-between hover:bg-gray-50 transition"
           >
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm">3</span>
+              <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">3</span>
               Additional Details
             </h2>
             <svg className={`w-6 h-6 text-indigo-600 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -819,12 +819,12 @@ const AdminDashboard: React.FC = () => {
                               </button>
                             </div>
                           )) : (
-                            <span className="section-note">Select or add up to 3 colors.</span>
+                            <span className="section-note">Select or add colors.</span>
                           )}
                         </div>
                       </div>
                       <div className="color-selection">
-                        {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'].map((color) => (
+                        {['#000000', '#FFFFFF', '#FF0000','#00FFFF',].map((color) => (
                           <button
                             key={color}
                             type="button"
@@ -851,7 +851,7 @@ const AdminDashboard: React.FC = () => {
                         </button>
                       </div>
                       {colorInputError && <span className="field-error">{colorInputError}</span>}
-                      <p className="section-note">Enter a color code or click one of the swatches. Maximum 3 colors.</p>
+                      <p className="section-note">Enter a color code or click one of the swatches.</p>
                     </div>
 
                     <div className="form-row form-row--spaced">

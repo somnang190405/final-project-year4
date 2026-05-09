@@ -259,7 +259,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                                 }
                               }}
                               disabled={returnBusy}
-                              className="flex-1 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-indigo-400/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex-1 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-black shadow-lg hover:shadow-indigo-400/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {returnBusy ? 'Submitting...' : '✓ Submit Return'}
                             </button>

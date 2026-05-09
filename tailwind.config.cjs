@@ -1,18 +1,16 @@
-/** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    './index.html',
-    './App.tsx',
-    './index.tsx',
-    './admin/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './customer/**/*.{ts,tsx}',
-    './services/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-    './**/*.{ts,tsx}',
-  ],
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        // This overrides purple to be black
+        purple: {
+          500: '#000000',
+          600: '#000000',
+          700: '#1a1a1a',
+        },
+      },
+    },
   },
   plugins: [],
-};
+}
