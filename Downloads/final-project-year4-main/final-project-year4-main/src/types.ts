@@ -13,6 +13,7 @@ export enum OrderStatus {
 
 export interface User {
   id: string;
+  customerId?: string; // Auto-generated incremental customer ID (e.g., "001", "002")
   name: string;
   email: string;
   role: UserRole;
@@ -75,6 +76,7 @@ export interface OrderReturnRequest {
 
 export interface Order {
   id: string;
+  orderNumber?: string; // Auto-generated order number (e.g., "001", "002")
   userId: string;
   date: string;
   status: OrderStatus;

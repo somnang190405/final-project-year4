@@ -29,11 +29,13 @@ const UserManagement: React.FC = () => {
           <span>Role</span>
           <span>Actions</span>
         </div>
-        {users.map((user) => (
+        {users.map((user) => {
+          const customerIdDisplay = user.customerId ? `#${String(user.customerId).padStart(4, '0')}` : user.role === 'CUSTOMER' ? 'N/A' : '-';
+          return (
           <div className="um-row" key={user.id}>
             <span className="um-cell user">
               <img className="avatar" src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=111827&color=fff`} alt={user.name} />
-              <span className="name">{user.name}</span>
+              <span className="name">{user.name} {user.role === 'CUSTOMER' && <span className="text-xs text-gray-500">({customerIdDisplay})</span>}</span>
             </span>
             <span className="um-cell email">{user.email}</span>
             <span className="um-cell role">
@@ -49,7 +51,8 @@ const UserManagement: React.FC = () => {
               )}
             </span>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

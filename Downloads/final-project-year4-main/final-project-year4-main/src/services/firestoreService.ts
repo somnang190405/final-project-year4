@@ -23,6 +23,7 @@ const buildKeywords = (p: Partial<Types.Product>): string[] => {
 const mapUserDoc = (userId: string, data: Partial<Types.User>): Types.User => {
   return {
     id: userId,
+    customerId: data.customerId,
     name: data.name ?? "",
     email: data.email ?? "",
     role: data.role ?? Types.UserRole.CUSTOMER,
@@ -469,6 +470,40 @@ export const deleteUser = async (id: string) => {
   await deleteDoc(userDoc);
 };
 
+// Generate next customer ID (incremental, padded to 3 digits)
+export const generateNextCustomerId = async (): Promise<string> => {
+  const usersCol = collection(db, 'users');
+  const snapshot = await getDocs(query(usersCol, orderBy('customerId', 'desc'), limit(1)));
+  
+  let nextId = 1;
+  if (!snapshot.empty) {
+    const lastUser = snapshot.docs[0].data() as any;
+    const lastCustomerId = lastUser.customerId;
+    if (lastCustomerId && /^\d+$/.test(lastCustomerId)) {
+      nextId = parseInt(lastCustomerId, 10) + 1;
+    }
+  }
+  
+  return nextId.toString().padStart(3, '0');
+};
+
+// Generate next order number (incremental, padded to 3 digits)
+export const generateNextOrderNumber = async (): Promise<string> => {
+  const ordersCol = collection(db, 'orders');
+  const snapshot = await getDocs(query(ordersCol, orderBy('orderNumber', 'desc'), limit(1)));
+  
+  let nextId = 1;
+  if (!snapshot.empty) {
+    const lastOrder = snapshot.docs[0].data() as any;
+    const lastOrderNumber = lastOrder.orderNumber;
+    if (lastOrderNumber && /^\d+$/.test(lastOrderNumber)) {
+      nextId = parseInt(lastOrderNumber, 10) + 1;
+    }
+  }
+  
+  return nextId.toString().padStart(3, '0');
+};
+
 // Get all orders
 export const getAllOrders = async (): Promise<any[]> => {
   const ordersCol = collection(db, 'orders');
@@ -478,13 +513,15 @@ export const getAllOrders = async (): Promise<any[]> => {
 
 export const createOrder = async (order: Omit<Types.Order, 'id'>): Promise<Types.Order> => {
   const ordersCol = collection(db, 'orders');
+  const orderNumber = await generateNextOrderNumber();
   const payload: any = {
     ...order,
+    orderNumber,
     // keep a server timestamp for reliable sorting, and keep date as a readable string/iso
     createdAt: serverTimestamp(),
   };
   const docRef = await addDoc(ordersCol, payload);
-  return { id: docRef.id, ...(order as any) } as Types.Order;
+  return { id: docRef.id, ...(order as any), orderNumber } as Types.Order;
 };
 
 // Create an order and decrement product stock in a single transaction.

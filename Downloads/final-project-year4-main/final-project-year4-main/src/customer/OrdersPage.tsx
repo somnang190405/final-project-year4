@@ -141,7 +141,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
               </div>
               <div className="space-y-4">
                 {pendingReturnOrders.map((order) => {
-                  const orderNo = `#${String(order.id).slice(0, 10)}`;
+                  const orderNo = order.orderNumber ? `#${String(order.orderNumber).padStart(4, '0')}` : `#${String(order.id).slice(0, 10)}`;
                   const date = formatDate(order.date || (order as any).createdAt || '');
                   const comment = order.returnRequest?.customerComment || 'No note provided.';
                   return (
@@ -197,7 +197,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
               </div>
               <div className="space-y-4">
                 {eligibleReturnOrders.map((order) => {
-                  const orderNo = `#${String(order.id).slice(0, 10)}`;
+                  const orderNo = order.orderNumber ? `#${String(order.orderNumber).padStart(4, '0')}` : `#${String(order.id).slice(0, 10)}`;
                   const date = formatDate(order.date || (order as any).createdAt || '');
                   const showingForm = activeReturnOrder === order.id;
                   return (

@@ -81,9 +81,10 @@ const OrderManagement: React.FC = () => {
             const canDeliver = order.status === OrderStatus.SHIPPED;
             const canCancel = order.status === OrderStatus.PENDING;
             const totalText = typeof (order as any).total === 'number' ? `$${(order as any).total.toFixed(2)}` : '$0.00';
+            const orderNumber = order.orderNumber ? String(order.orderNumber).padStart(4, '0') : order.id.slice(0, 8);
             return (
               <div className="om-row" key={order.id}>
-                <span className="om-cell id">{order.id}</span>
+                <span className="om-cell id">{orderNumber}</span>
                 <span className="om-cell date">{order.date}</span>
                 <span className="om-cell customer">{order.userId || 'guest'}</span>
                 <span className="om-cell total">{totalText}</span>

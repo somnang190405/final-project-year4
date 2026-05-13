@@ -8,9 +8,13 @@ import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
 import OrderManagement from "./OrderManagement";
 import SalesReports from "./SalesReports";
-import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, ShieldCheck, Plus, Edit, Trash2, Upload } from "lucide-react";
+import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, ShieldCheck, Plus, Edit, Trash2, Upload, LogOut } from "lucide-react";
 
-const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onLogout?: () => void;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const storage = React.useMemo(() => getStorage(firebaseApp), []);
   const navigate = useNavigate();
   const goHome = () => {
@@ -19,6 +23,12 @@ const AdminDashboard: React.FC = () => {
     } catch (e) {
       try { window.location.href = '/'; } catch { }
     }
+  };
+  const handleLogoutClick = () => {
+    if (onLogout) {
+      onLogout();
+    }
+    navigate('/');
   };
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -513,7 +523,7 @@ const AdminDashboard: React.FC = () => {
         </nav>
       </aside>
       <main className="admin-main light">
-        <header className="topbar">
+        <header className="topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">
             {activeView === "dashboard" && "Overview"}
             {activeView === "products" && "Products"}
@@ -521,6 +531,17 @@ const AdminDashboard: React.FC = () => {
             {activeView === "users" && "User Management"}
             {activeView === "sales" && "Sales Reports"}
           </h1>
+          <button
+            onClick={() => {
+              if (onLogout) onLogout();
+              navigate('/');
+            }}
+            className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-2 font-medium transition-colors"
+            title="Logout"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
         </header>
 
         {activeView === "dashboard" && (
