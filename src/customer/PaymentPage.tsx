@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../components/customer/CartContext';
 import { clearUserCart, createOrderAndDecrementStock } from '../services/firestoreService';
 import { OrderStatus, User } from '../types';
-import { calcCartTotals, calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent } from '../services/pricing';
+import { calcCartTotals, calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent, SHIPPING_THRESHOLD } from '../services/pricing';
 import { getPaymentConfig } from '../services/paymentConfig';
 import QRCode from 'qrcode';
 import { buildAbaKhqrPayload } from '../services/abaKhqr';
@@ -75,11 +75,13 @@ const StepProgressIndicator: React.FC<{ currentStep: number }> = ({ currentStep 
 const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const navigate = useNavigate();
   const { cart, hydrateCart } = useCart();
-  const { originalSubtotal, discountedSubtotal, discountTotal } = useMemo(() => calcCartTotals(cart), [cart]);
-  const fee = 0;
-  const total = discountedSubtotal + fee;
+  const { originalSubtotal, discountedSubtotal, discountTotal, shippingFee, total, freeShippingEligible } = useMemo(
+    () => calcCartTotals(cart),
+    [cart]
+  );
 
   const paymentCfg = useMemo(() => getPaymentConfig(), []);
+  const remainingForFreeDelivery = Math.max(0, SHIPPING_THRESHOLD - discountedSubtotal);
 
   const [busy, setBusy] = useState(false);
 
@@ -527,8 +529,15 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-semibold text-gray-900">{fmtMoney(0)}</span>
+                  <span className={`font-semibold ${freeShippingEligible ? 'text-emerald-600' : 'text-gray-900'}`}>
+                    {shippingFee === 0 ? 'Free' : fmtMoney(shippingFee)}
+                  </span>
                 </div>
+                {!freeShippingEligible && (
+                  <div className="rounded-3xl bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
+                    Add {fmtMoney(remainingForFreeDelivery)} more to unlock free delivery on orders over $100.
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center mb-6">

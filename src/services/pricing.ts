@@ -1,3 +1,6 @@
+export const SHIPPING_THRESHOLD = 100;
+export const DEFAULT_SHIPPING_FEE = 10;
+
 export const normalizePromotionPercent = (value: unknown): number => {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -20,11 +23,16 @@ export const calcCartTotals = <T extends { price: number; promotionPercent?: unk
     0
   );
   const discountTotal = Math.max(0, originalSubtotal - discountedSubtotal);
+  const shippingFee = discountedSubtotal >= SHIPPING_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE;
+  const total = discountedSubtotal + shippingFee;
 
   return {
     originalSubtotal,
     discountedSubtotal,
     discountTotal,
+    shippingFee,
+    total,
+    freeShippingEligible: shippingFee === 0,
   };
 };
 
