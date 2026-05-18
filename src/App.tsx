@@ -476,7 +476,10 @@ const App: React.FC = () => {
   if (!initialAuthChecked) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
-        <p className="text-xl font-medium text-gray-700">Connecting to Backend...</p>
+        <div className="text-center">
+          <div className="mb-4"><span className="animate-spin inline-block">⏳</span></div>
+          <p className="text-xl font-medium text-gray-700">Securing your order...</p>
+        </div>
       </div>
     );
   }
@@ -548,11 +551,23 @@ const App: React.FC = () => {
               <Routes>
                 <Route
                   path="/"
-                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/')} />}
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/')} />
+                    )
+                  }
                 />
                 <Route
                   path="/home"
-                  element={<CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/home')} />}
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/home')} />
+                    )
+                  }
                 />
                 <Route
                   path="/admin"
@@ -566,33 +581,103 @@ const App: React.FC = () => {
                 />
                 <Route
                   path="/product/:id"
-                  element={<ProductDetails wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth(`/product/${window.location.pathname.split('/').pop() || ''}`)} />}
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <ProductDetails wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth(`/product/${window.location.pathname.split('/').pop() || ''}`)} />
+                    )
+                  }
                 />
                 <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route
                   path="/profile"
-                  element={<ProfilePage onRequireAuth={requireAuth} />}
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <ProfilePage onRequireAuth={requireAuth} />
+                    )
+                  }
                 />
                 <Route
                   path="/wishlist"
                   element={
-                    <Wishlist
-                      wishlist={wishlist}
-                      toggleWishlist={handleToggleWishlist}
-                      setView={(view) => {
-                        if (view === 'shop') window.location.href = '/shop';
-                      }}
-                      user={user}
-                      onRequireAuth={() => requireAuth('/wishlist')}
-                    />
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <Wishlist
+                        wishlist={wishlist}
+                        toggleWishlist={handleToggleWishlist}
+                        setView={(view) => {
+                          if (view === 'shop') window.location.href = '/shop';
+                        }}
+                        user={user}
+                        onRequireAuth={() => requireAuth('/wishlist')}
+                      />
+                    )
                   }
                 />
-                <Route path="/cart" element={<CartPage user={user} />} />
-                <Route path="/search" element={<SearchPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/search')} />} />
-                <Route path="/shop" element={<Shop wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/shop')} />} />
-                <Route path="/new-arrivals" element={<NewArrivalsPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/new-arrivals')} />} />
-                <Route path="/orders" element={<OrdersPage user={user} onRequireAuth={requireAuth} />} />
-                <Route path="/payment" element={<PaymentPage user={user} onRequireAuth={requireAuth} />} />
+                <Route
+                  path="/cart"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <CartPage user={user} />
+                    )
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <SearchPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/search')} />
+                    )
+                  }
+                />
+                <Route
+                  path="/shop"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <Shop wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/shop')} />
+                    )
+                  }
+                />
+                <Route
+                  path="/new-arrivals"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <NewArrivalsPage wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/new-arrivals')} />
+                    )
+                  }
+                />
+                <Route
+                  path="/orders"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <OrdersPage user={user} onRequireAuth={requireAuth} />
+                    )
+                  }
+                />
+                <Route
+                  path="/payment"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <PaymentPage user={user} onRequireAuth={requireAuth} />
+                    )
+                  }
+                />
               </Routes>
             </React.Suspense>
           </RouteScaffold>

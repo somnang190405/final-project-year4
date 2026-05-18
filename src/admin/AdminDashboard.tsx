@@ -8,11 +8,22 @@ import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
 import OrderManagement from "./OrderManagement";
 import SalesReports from "./SalesReports";
-import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, ShieldCheck, Plus, Edit, Trash2, Upload } from "lucide-react";
+import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, ShieldCheck, Plus, Edit, Trash2, Upload, LogOut } from "lucide-react";
+import { auth } from "../services/firebase";
 
 const AdminDashboard: React.FC = () => {
   const storage = React.useMemo(() => getStorage(firebaseApp), []);
   const navigate = useNavigate();
+  
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+  
   const goHome = () => {
     try {
       navigate('/');
@@ -521,6 +532,16 @@ const AdminDashboard: React.FC = () => {
             {activeView === "users" && "User Management"}
             {activeView === "sales" && "Sales Reports"}
           </h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-medium"
+              title="Logout"
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
+            </button>
+          </div>
         </header>
 
         {activeView === "dashboard" && (
