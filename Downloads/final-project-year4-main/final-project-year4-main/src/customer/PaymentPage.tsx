@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../components/customer/CartContext';
 import { clearUserCart, createOrderAndDecrementStock } from '../services/firestoreService';
 import { OrderStatus, User } from '../types';
-import { calcCartTotals, calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent } from '../services/pricing';
+import { calcCartTotals, calcDiscountedUnitPrice, calcShippingFee, formatPromotionPercentBadge, normalizePromotionPercent, FREE_DELIVERY_THRESHOLD } from '../services/pricing';
 import { getPaymentConfig } from '../services/paymentConfig';
 import QRCode from 'qrcode';
 import { buildAbaKhqrPayload } from '../services/abaKhqr';
@@ -78,7 +78,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const navigate = useNavigate();
   const { cart, hydrateCart } = useCart();
   const { originalSubtotal, discountedSubtotal, discountTotal } = useMemo(() => calcCartTotals(cart), [cart]);
-  const fee = 0;
+  const fee = calcShippingFee(discountedSubtotal);
   const total = discountedSubtotal + fee;
 
   const paymentCfg = useMemo(() => getPaymentConfig(), []);
@@ -596,7 +596,10 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-semibold text-gray-900">{fmtMoney(0)}</span>
+                  <span className="font-semibold text-gray-900">{fmtMoney(fee)}</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {fee === 0 ? 'Free delivery applied for orders over $100.' : `Orders over $${FREE_DELIVERY_THRESHOLD} receive free delivery.`}
                 </div>
               </div>
 

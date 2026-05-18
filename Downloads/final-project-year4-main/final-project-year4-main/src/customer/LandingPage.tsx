@@ -18,7 +18,7 @@ const LandingPage: React.FC = () => {
 		{
 			icon: <Truck className="w-8 h-8 text-indigo-600" />,
 			title: "Free Shipping",
-			description: "On orders over $50",
+			description: "On orders over $100",
 		},
 		{
 			icon: <Shield className="w-8 h-8 text-indigo-600" />,

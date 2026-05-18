@@ -3,16 +3,20 @@ import { auth } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getUserFromFirestore, updateUser, uploadUserAvatar } from '../services/firestoreService';
 import { User as TUser } from '../types';
-import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Check, AlertCircle } from 'lucide-react';
-import './ProfilePage.css';
+import { useNavigate } from 'react-router-dom';
+import { Camera, Check, AlertCircle, UserCircle2 } from 'lucide-react';
 
 const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = ({ onRequireAuth }) => {
   const [user, setUser] = useState<TUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
-  // Editable form state (must be declared unconditionally to obey React hook rules)
   const initialForm = useMemo(() => {
     const u = user;
     return {
@@ -26,22 +30,14 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
   }, [user]);
 
   const [form, setForm] = useState(initialForm);
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
-  const [showMore, setShowMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
-  // Keep form in sync when user loads/refreshes.
   useEffect(() => {
     setForm(initialForm);
     setAvatarPreview(user?.avatar || null);
     setAvatarFile(null);
     setSavedMsg(null);
     setError(null);
-    // Auto-expand "More details" if user already has optional info saved.
-    setShowMore(Boolean(initialForm.dateOfBirth));
+    setIsEditing(false);
   }, [initialForm, user?.avatar]);
 
   useEffect(() => {
@@ -67,7 +63,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12">
         <div className="text-gray-600 text-center">Loading your profile…</div>
       </div>
     );
@@ -75,17 +71,15 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12">
         <div className="max-w-md mx-auto text-center">
-          <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+            <UserCircle2 className="w-12 h-12 text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Profile</h1>
-          <p className="text-gray-600 mb-8">You need to sign in to view your profile.</p>
+          <h1 className="text-3xl font-semibold text-slate-900 mb-3">Profile Unavailable</h1>
+          <p className="text-gray-600 mb-8">Sign in to manage your account details and keep your profile up to date.</p>
           <button
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:shadow-xl transition-all transform hover:scale-105"
+            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
             onClick={() => {
               if (onRequireAuth) onRequireAuth('/profile');
               else navigate('/');
@@ -98,15 +92,17 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
     );
   }
 
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || 'Customer';
+  const formattedPhone = user.phoneNumber || 'Not added';
+  const formattedDob = user.dateOfBirth || 'Not added';
+
   const onChange = (field: keyof typeof initialForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [field]: e.target.value });
   };
 
   const parseDobToISO = (input: string) => {
     const v = input.trim();
-    // accept YYYY-MM-DD directly
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    // accept DD/MM/YYYY
     const m = v.match(/^([0-3]?\d)\/([0-1]?\d)\/(\d{4})$/);
     if (m) {
       const dd = m[1].padStart(2, '0');
@@ -114,7 +110,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
       const yyyy = m[3];
       return `${yyyy}-${mm}-${dd}`;
     }
-    return v; // fallback store raw
+    return v;
   };
 
   const save = async () => {
@@ -125,6 +121,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
       return;
     }
     setSaving(true);
+
     try {
       const updatedFields: any = {
         name: [form.firstName, form.lastName].filter(Boolean).join(' ').trim() || user.name,
@@ -134,6 +131,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
         phoneNumber: form.phoneNumber,
         dateOfBirth: parseDobToISO(form.dateOfBirth),
       };
+
       if (avatarFile) {
         try {
           const avatarUrl = await uploadUserAvatar(avatarFile, user.id);
@@ -148,11 +146,11 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
 
       await updateUser(user.id, updatedFields);
       setSavedMsg('Profile updated successfully!');
-      // refresh local user object
       const refreshed = await getUserFromFirestore(user.id);
       if (refreshed) setUser(refreshed);
+      setIsEditing(false);
     } catch (e) {
-      setSavedMsg('Failed to save profile');
+      setSavedMsg('Failed to save profile.');
       setError(String(e));
     } finally {
       setSaving(false);
@@ -172,181 +170,271 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="profile-header-card mb-8">
-          <div>
-            <h3 className="profile-page-title">Your Profile</h3>
-            <p className="profile-page-subtitle">Update your account information and keep your profile current.</p>
-          </div>
-        </div>
-
-
-        {/* Section 1: Basic Information */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">1</span>
-            Basic Information
-          </h2>
-          
-          {/* Gender Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-900 mb-3">Gender (required)</label>
-            <div className="flex gap-3 flex-wrap">
-              {(['Male', 'Female', 'Other'] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setForm({ ...form, gender: g })}
-                  className={`px-6 py-3 rounded-full border-2 text-sm font-semibold transition-all transform hover:scale-105 ${
-                    form.gender === g
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-900 border-gray-300 hover:border-indigo-400'
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Name Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="min-h-screen bg-slate-50 py-10">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="rounded-[2rem] bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-8 shadow-2xl text-white mb-10 overflow-hidden">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">First Name</label>
-              <input
-                value={form.firstName}
-                onChange={onChange('firstName')}
-                placeholder="John"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Last Name</label>
-              <input
-                value={form.lastName}
-                onChange={onChange('lastName')}
-                placeholder="Doe"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2: Contact Information */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">2</span>
-            Contact Information
-          </h2>
-
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Email Address</label>
-              <input
-                value={form.email}
-                readOnly
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-2">Email cannot be changed</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Mobile Number</label>
-              <input
-                value={form.phoneNumber}
-                onChange={onChange('phoneNumber')}
-                placeholder="+1 (555) 123-4567"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Additional Details (expandable) */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className="w-full px-8 py-6 flex items-center justify-between hover:bg-gray-50 transition"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">3</span>
-              Additional Details
-            </h2>
-            <svg className={`w-6 h-6 text-indigo-600 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </button>
-
-          {showMore && (
-            <div className="px-8 py-6 border-t border-gray-200 bg-gray-50">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Date of Birth</label>
-                <input
-                  value={form.dateOfBirth}
-                  onChange={onChange('dateOfBirth')}
-                  placeholder="YYYY-MM-DD or DD/MM/YYYY"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                />
-                <p className="text-xs text-gray-500 mt-2">Format: YYYY-MM-DD or DD/MM/YYYY</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Messages */}
-        {error && (
-          <div className="mt-8 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {savedMsg && (
-          <div className={`mt-8 border-l-4 p-4 rounded-lg flex items-start gap-3 ${
-            savedMsg.includes('successfully')
-              ? 'bg-emerald-50 border-emerald-500'
-              : 'bg-red-50 border-red-500'
-          }`}>
-            {savedMsg.includes('successfully') ? (
-              <Check className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-            )}
-            <div>
-              <h3 className={`font-semibold ${savedMsg.includes('successfully') ? 'text-emerald-900' : 'text-red-900'}`}>
-                {savedMsg.includes('successfully') ? 'Success' : 'Error'}
-              </h3>
-              <p className={`text-sm mt-1 ${savedMsg.includes('successfully') ? 'text-emerald-700' : 'text-red-700'}`}>
-                {savedMsg}
+              <p className="text-sm uppercase tracking-[0.45em] text-indigo-300 mb-3">Profile Center</p>
+              <h1 className="text-4xl font-semibold tracking-tight">Manage your account</h1>
+              <p className="mt-3 max-w-2xl text-gray-300 leading-7">
+                Keep your profile sleek and secure. Easily switch between previewing your information and editing the fields you want to update.
               </p>
             </div>
+            <div className="rounded-3xl bg-white/10 border border-white/10 p-5 shadow-xl backdrop-blur-xl">
+              <p className="text-sm text-slate-300">Member since</p>
+              <p className="mt-2 text-2xl font-semibold">{new Date(user.createdAt || Date.now()).toLocaleDateString()}</p>
+            </div>
           </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="profile-actions">
-          <button
-            onClick={save}
-            disabled={saving}
-            className="btn btn-primary"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <Link
-            to="/orders"
-            className="btn btn-secondary"
-          >
-            Cancel
-          </Link>
         </div>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Your information is encrypted and secure. We never share your data with third parties.
-        </p>
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-[2rem] border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+                <div className="relative">
+                  <div className="w-28 h-28 rounded-[2rem] bg-gradient-to-br from-indigo-700 to-slate-900 shadow-xl overflow-hidden">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white text-3xl">{fullName.charAt(0)}</div>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-2 -right-2">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-2 text-sm text-white shadow ring-1 ring-emerald-200">
+                      <Check className="w-4 h-4" /> Verified
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-sm uppercase tracking-[0.3em] text-indigo-500 mb-2">Hello,</p>
+                  <h2 className="text-3xl font-semibold text-slate-900">{fullName}</h2>
+                  <p className="mt-2 text-gray-600">Welcome back. Your profile is ready to update with a clean, premium experience.</p>
+                </div>
+              </div>
+
+              <div className="mt-10 grid gap-4">
+                <div className="rounded-3xl bg-slate-50 p-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Email</p>
+                    <p className="mt-2 text-base font-semibold text-slate-900">{user.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Account type</p>
+                    <p className="mt-2 text-base font-semibold text-slate-900">{user.role || 'Customer'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Phone</p>
+                    <p className="mt-2 text-base font-semibold text-slate-900">{formattedPhone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Gender</p>
+                    <p className="mt-2 text-base font-semibold text-slate-900">{form.gender || 'Not set'}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl bg-white border border-gray-200 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.3em] text-indigo-500">Profile activity</p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-900">Account overview</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 transition"
+                    >
+                      Edit profile
+                    </button>
+                  </div>
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-3xl bg-slate-50 p-5">
+                      <p className="text-sm text-slate-500">Date of birth</p>
+                      <p className="mt-3 text-base font-medium text-slate-900">{formattedDob}</p>
+                    </div>
+                    <div className="rounded-3xl bg-slate-50 p-5">
+                      <p className="text-sm text-slate-500">Last update</p>
+                      <p className="mt-3 text-base font-medium text-slate-900">{new Date(user.updatedAt || Date.now()).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.3em] text-indigo-500">Account settings</p>
+                  <h2 className="mt-3 text-2xl font-semibold text-slate-900">{isEditing ? 'Edit profile information' : 'View profile details'}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing((value) => !value)}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                >
+                  {isEditing ? 'Preview profile' : 'Edit profile'}
+                </button>
+              </div>
+
+              {isEditing ? (
+                <div className="mt-8 space-y-8">
+                  <div className="grid gap-6">
+                    <div className="rounded-3xl bg-slate-50 p-6 grid gap-6 sm:grid-cols-[auto_1fr]">
+                      <div className="flex items-center justify-center">
+                        <div className="relative">
+                          <div className="w-28 h-28 rounded-[2rem] bg-slate-100 overflow-hidden border border-gray-200">
+                            {avatarPreview ? (
+                              <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400 text-4xl">+</div>
+                            )}
+                          </div>
+                          <label className="absolute -bottom-2 -right-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow ring-1 ring-slate-200 hover:bg-slate-100 transition">
+                            <Camera className="w-4 h-4" />
+                            Change
+                            <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-sm text-slate-500">Upload a new avatar to personalize your profile card.</p>
+                        <p className="text-sm text-slate-500">Supported formats: JPG, PNG, WEBP.</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-900">First name</span>
+                          <input
+                            value={form.firstName}
+                            onChange={onChange('firstName')}
+                            placeholder="John"
+                            className="w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+                          />
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-900">Last name</span>
+                          <input
+                            value={form.lastName}
+                            onChange={onChange('lastName')}
+                            placeholder="Doe"
+                            className="w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-900">Gender</span>
+                        <select
+                          value={form.gender}
+                          onChange={onChange('gender')}
+                          className="w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+                        >
+                          <option value="">Select gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-900">Phone number</span>
+                        <input
+                          value={form.phoneNumber}
+                          onChange={onChange('phoneNumber')}
+                          placeholder="+1 (555) 123-4567"
+                          className="w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+                        />
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-900">Date of birth</span>
+                        <input
+                          value={form.dateOfBirth}
+                          onChange={onChange('dateOfBirth')}
+                          placeholder="YYYY-MM-DD"
+                          className="w-full rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
+                  {savedMsg && (
+                    <div className={`rounded-3xl border p-5 text-sm ${savedMsg.includes('successfully') ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                      {savedMsg}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      onClick={save}
+                      disabled={saving}
+                      className="inline-flex min-w-[10rem] items-center justify-center rounded-3xl bg-black px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {saving ? 'Saving changes…' : 'Save Changes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setForm(initialForm);
+                        setAvatarPreview(user?.avatar || null);
+                        setAvatarFile(null);
+                        setError(null);
+                        setSavedMsg(null);
+                      }}
+                      className="inline-flex min-w-[10rem] items-center justify-center rounded-3xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-8 space-y-6">
+                  <div className="grid gap-4">
+                    <div className="rounded-3xl bg-slate-50 p-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Contact details</p>
+                        <p className="mt-1 text-sm text-slate-600">Email, phone, and date of birth.</p>
+                      </div>
+                      <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase text-indigo-700">Overview</span>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Email address</p>
+                        <p className="mt-3 text-base font-semibold text-slate-900">{form.email}</p>
+                      </div>
+                      <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Phone number</p>
+                        <p className="mt-3 text-base font-semibold text-slate-900">{formattedPhone}</p>
+                      </div>
+                      <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Gender</p>
+                        <p className="mt-3 text-base font-semibold text-slate-900">{form.gender || 'Not set'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-white p-5 border border-gray-200">
+                        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Date of birth</p>
+                        <p className="mt-3 text-base font-semibold text-slate-900">{formattedDob}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

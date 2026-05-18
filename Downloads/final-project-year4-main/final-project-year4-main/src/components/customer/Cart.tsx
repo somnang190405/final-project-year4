@@ -2,7 +2,9 @@ import React from 'react';
 import { CartItem, User } from '../../types';
 import { ShoppingBag, CheckCircle, Trash2, Minus, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { calcCartTotals, calcDiscountedUnitPrice, formatPromotionPercentBadge, normalizePromotionPercent } from '../../services/pricing';
+import { calcCartTotals, calcDiscountedUnitPrice, calcShippingFee, formatPromotionPercentBadge, normalizePromotionPercent, FREE_DELIVERY_THRESHOLD } from '../../services/pricing';
+
+const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 
 type Props = {
   cart: CartItem[];
@@ -16,14 +18,17 @@ type Props = {
 const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Props) => {
   const navigate = useNavigate();
   const { originalSubtotal, discountedSubtotal, discountTotal } = calcCartTotals(cart);
+  const shippingFee = calcShippingFee(discountedSubtotal);
+  const total = discountedSubtotal + shippingFee;
+  const freeDelivery = shippingFee === 0;
+  const remainingForFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - discountedSubtotal);
 
   const handleCheckout = async () => {
     if (!user) {
-      if(notify) notify("Please login to checkout", "error");
-      return; 
+      if (notify) notify('Please login to checkout', 'error');
+      return;
     }
 
-    // Show payment screen (QR + summary). The payment screen finalizes the order in Firestore.
     navigate('/payment');
   };
 
@@ -128,12 +133,19 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                     )}
                     <div className="flex justify-between">
                     <span className="text-gray-600">Shipping</span>
-                    <span className="text-green-600 font-medium">Free</span>
-                    </div>
+                    <span className={`font-medium ${freeDelivery ? 'text-emerald-600' : 'text-slate-900'}`}>
+                      {freeDelivery ? 'Free' : fmtMoney(shippingFee)}
+                    </span>
+                </div>
+                <div className={`rounded-3xl px-4 py-3 text-sm ${freeDelivery ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-yellow-50 text-amber-900 border border-amber-100'} mb-4`}>
+                  {freeDelivery
+                    ? 'Free delivery unlocked for orders over $100.'
+                    : `Spend ${fmtMoney(remainingForFreeDelivery)} more to qualify for free delivery.`}
+                </div>
                 </div>
                 <div className="flex justify-between font-bold text-xl mb-8">
                     <span>Total</span>
-                    <span>${discountedSubtotal.toFixed(2)}</span>
+                    <span>{fmtMoney(total)}</span>
                 </div>
                 <button onClick={handleCheckout} className="w-full bg-black text-white py-4 rounded-xl font-bold tracking-wide hover:bg-gray-800 transition-all hover:shadow-lg transform hover:-translate-y-1">
                     Proceed to Checkout
