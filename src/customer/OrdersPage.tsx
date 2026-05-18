@@ -225,7 +225,27 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                         </div>
                       </div>
                       {showingForm ? (
-                        <div className="space-y-4">
+                        <div className="space-y-4">                          {/* Show items with images for context */}
+                          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                            <p className="text-sm font-semibold text-gray-900 mb-3">Items in this order:</p>
+                            <div className="space-y-2">
+                              {(order.items || []).map((item, idx) => (
+                                <div key={idx} className="flex gap-3 items-start">
+                                  <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                    {item.image ? (
+                                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden';}} />
+                                    ) : (
+                                      <span className="text-gray-400 text-xs flex items-center justify-center w-full h-full">No img</span>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                    <p className="text-xs text-gray-500">Qty: {item.quantity} × ${item.price.toFixed(2)}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                           <div>
                             <label className="block text-sm font-semibold text-gray-900 mb-2">Tell us about the return</label>
                             <textarea
@@ -300,83 +320,158 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
           )}
         </div>
       ) : rows.length === 0 ? (
-        <div className="text-center text-gray-500">No order history yet.</div>
+        <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center shadow-sm">
+          <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-semibold text-gray-900 mb-2">No orders yet?</h3>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">Your next favorite outfit is waiting! Start exploring our collection and discover something amazing.</p>
+          <button 
+            onClick={() => navigate('/')}
+            className="inline-flex items-center justify-center rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-3 text-base font-semibold text-black hover:shadow-xl hover:shadow-indigo-500/30 transition-all"
+          >
+            Start Shopping
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-8">
           {rows.map((order) => {
             const paid = String((order as any).paymentStatus || '').toUpperCase() === 'PAID' || !!(order as any).paidAt;
             const status = String(order.status || 'Pending');
-            const statusColor = status === 'Delivered' ? 'bg-green-100 text-green-700' : status === 'Shipped' ? 'bg-blue-100 text-blue-700' : status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-700';
             const date = formatDate((order as any).date || (order as any).createdAt || '');
             const total = Number(order.total || 0);
-            const orderNo = `#${String(order.id).slice(0, 10)}`;
+            const orderNo = `TM-${String(order.id).slice(0, 6).toUpperCase()}`;
+
+            // Premium status badge configuration
+            const getStatusBadge = (s: string) => {
+              switch(s) {
+                case 'Pending': return { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', label: 'Pending' };
+                case 'Shipped': return { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200', label: 'Shipped' };
+                case 'Delivered': return { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', label: 'Delivered' };
+                case 'Cancelled': return { bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', label: 'Cancelled' };
+                default: return { bg: 'bg-gray-50', text: 'text-gray-800', border: 'border-gray-200', label: s };
+              }
+            };
+
+            const badge = getStatusBadge(status);
+
+            // Progress tracking
+            const progressSteps = [
+              { label: 'Ordered', icon: '●', active: true },
+              { label: 'Shipped', icon: status === 'Shipped' || status === 'Delivered' ? '●' : '○', active: status === 'Shipped' || status === 'Delivered' },
+              { label: 'Delivered', icon: status === 'Delivered' ? '●' : '○', active: status === 'Delivered' }
+            ];
 
             return (
-              <div key={order.id} className="rounded-xl border border-gray-200 shadow-sm bg-white p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <span className="font-mono text-xs text-gray-500">{orderNo}</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor}`}>{status}</span>
-                    {paid && <span className="px-2 py-1 rounded text-xs bg-black text-white">Paid</span>}
-                    <span className="text-gray-500 text-xs">{date}</span>
+              <div key={order.id} className="rounded-3xl border border-gray-200 shadow-sm bg-white overflow-hidden hover:shadow-md transition-shadow">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-gray-50 to-white p-6 border-b border-gray-200">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                    <div>
+                      <div className="text-sm text-gray-500 font-medium mb-1">Order Number</div>
+                      <div className="text-xl font-bold text-gray-900">{orderNo}</div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`${badge.bg} ${badge.text} border ${badge.border} px-3 py-1 rounded-full text-xs font-medium`}>
+                        {badge.label}
+                      </span>
+                      {paid && <span className="bg-black text-white px-3 py-1 rounded-full text-xs font-medium">Paid</span>}
+                      <span className="text-gray-500 text-sm">{date}</span>
+                    </div>
                   </div>
-                  <div className="text-right font-bold text-lg text-gray-900">US ${total.toFixed(2)}</div>
+
+                  {/* Progress bar for orders in transit */}
+                  {status !== 'Delivered' && status !== 'Cancelled' && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-xs font-medium text-gray-600">
+                        {progressSteps.map((step, idx) => (
+                          <div key={step.label} className="text-center flex-1">
+                            <div className={`flex justify-center mb-1 ${step.active ? 'text-indigo-600' : 'text-gray-400'}`}>
+                              {step.icon}
+                            </div>
+                            <div className={step.active ? 'text-gray-900 font-semibold' : 'text-gray-500'}>{step.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-1 rounded-full transition-all ${
+                          status === 'Pending' ? 'bg-amber-400 w-1/3' : 
+                          status === 'Shipped' ? 'bg-blue-500 w-2/3' : 
+                          'bg-emerald-500 w-full'
+                        }`}></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Progress bar for in-progress orders */}
-                {status !== 'Delivered' && status !== 'Cancelled' && (
-                  <div className="w-full h-2 bg-gray-100 rounded mb-4">
-                    <div className={`h-2 rounded ${status === 'Pending' ? 'bg-yellow-400 w-1/3' : status === 'Shipped' ? 'bg-blue-500 w-2/3' : 'bg-green-500 w-full'}`}></div>
-                  </div>
-                )}
-
+                {/* Return status if applicable */}
                 {order.returnRequest?.status && (
-                  <div className="rounded-2xl bg-gray-50 p-4 border border-gray-200 mb-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-gray-900">Return status</span>
-                      <span className="inline-flex rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
+                  <div className={`${
+                    order.returnRequest.status === 'Requested' ? 'bg-yellow-50 border-yellow-200' :
+                    order.returnRequest.status === 'Approved' ? 'bg-emerald-50 border-emerald-200' :
+                    order.returnRequest.status === 'Declined' ? 'bg-rose-50 border-rose-200' :
+                    'bg-gray-50 border-gray-200'
+                  } p-4 border-b`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <span className="text-sm font-semibold text-gray-900">Return Status</span>
+                      <span className={`${
+                        order.returnRequest.status === 'Requested' ? 'bg-yellow-100 text-yellow-700' :
+                        order.returnRequest.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                        order.returnRequest.status === 'Declined' ? 'bg-rose-100 text-rose-700' :
+                        'bg-gray-100 text-gray-700'
+                      } rounded-full px-3 py-1 text-xs font-semibold`}>
                         {order.returnRequest.status}
                       </span>
                     </div>
                     {order.returnRequest.customerComment && (
-                      <p className="mt-3 text-sm text-gray-700">Customer note: {order.returnRequest.customerComment}</p>
+                      <p className="mt-3 text-sm text-gray-700 bg-white bg-opacity-50 p-3 rounded-lg">💬 Customer note: {order.returnRequest.customerComment}</p>
                     )}
                     {order.returnRequest.adminComment && (
-                      <p className="mt-2 text-sm text-gray-600">Store note: {order.returnRequest.adminComment}</p>
+                      <p className="mt-2 text-sm text-gray-600 bg-white bg-opacity-50 p-3 rounded-lg">📝 Store response: {order.returnRequest.adminComment}</p>
                     )}
                   </div>
                 )}
 
-                {/* Products in this order */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-500 border-b">
-                        <th className="py-2 text-left">Product</th>
-                        <th className="py-2 text-left">Name</th>
-                        <th className="py-2 text-center">Qty</th>
-                        <th className="py-2 text-right">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(order.items || []).map((item, idx) => (
-                        <tr key={idx} className="border-b last:border-0">
-                          <td className="py-2 pr-2">
-                            <div className="w-14 h-14 bg-gray-50 rounded overflow-hidden flex items-center justify-center">
-                              {item.image ? (
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden';}} />
-                              ) : (
-                                <div className="text-gray-300 text-xs">No image</div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2 pr-2 font-medium text-gray-900">{item.name}</td>
-                          <td className="py-2 text-center">{item.quantity}</td>
-                          <td className="py-2 text-right">${item.price.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* Items with images */}
+                <div className="p-6 space-y-4">
+                  <div className="font-semibold text-gray-900 mb-4">Items ({(order.items || []).length})</div>
+                  {(order.items || []).map((item, idx) => (
+                    <div key={idx} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+                      {/* Product Image */}
+                      <div className="flex-shrink-0">
+                        <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden';}} />
+                          ) : (
+                            <span className="text-gray-400 text-xs">No image</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Item Details */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-900 text-base truncate">{item.name}</h4>
+                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+                          <span>Qty: <span className="font-semibold text-gray-900">{item.quantity}</span></span>
+                          <span>Price: <span className="font-semibold text-gray-900">${item.price.toFixed(2)}</span></span>
+                          {item.originalPrice && item.originalPrice !== item.price && (
+                            <span className="line-through text-gray-500">${item.originalPrice.toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Subtotal */}
+                      <div className="flex-shrink-0 text-right">
+                        <div className="text-lg font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer with total */}
+                <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                  <span className="text-gray-600 font-medium">Order Total</span>
+                  <span className="text-2xl font-bold text-gray-900">${total.toFixed(2)}</span>
                 </div>
               </div>
             );

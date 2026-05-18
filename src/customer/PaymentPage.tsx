@@ -14,7 +14,7 @@ type Props = {
   onRequireAuth?: (redirectTo: string) => void;
 };
 
-type PaymentMethodType = 'CARD' | 'PAYPAL' | 'BANK' | 'QR';
+type PaymentMethodType = 'CARD' |'BANK';
 
 const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 const fmtNumber = (n: number) => n.toFixed(2);
@@ -26,8 +26,6 @@ const paymentMethodsMeta: Array<{
   icon: React.ComponentType<{ className?: string }>;
 }> = [
   { id: 'CARD', label: 'Credit Card', desc: 'Visa, Mastercard, Amex', icon: CreditCard },
-  { id: 'PAYPAL', label: 'PayPal', desc: 'Fast and secure', icon: ShieldCheck },
-  { id: 'QR', label: 'QR Code', desc: 'ABA KHQR payment', icon: QrCode },
   { id: 'BANK', label: 'Bank Transfer', desc: 'Direct transfer to ABA', icon: Banknote },
 ];
 
@@ -47,7 +45,7 @@ const StepProgressIndicator: React.FC<{ currentStep: number }> = ({ currentStep 
             {/* Step circle */}
             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold mb-2 transition-all ${
               currentStep >= step.number
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-black'
                 : 'bg-gray-200 text-gray-600'
             }`}>
               {currentStep > step.number ? (
@@ -82,19 +80,6 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   const total = discountedSubtotal + fee;
 
   const paymentCfg = useMemo(() => getPaymentConfig(), []);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('PaymentPage Debug:', {
-      user: user ? { id: user.id, email: user.email } : null,
-      cartLength: cart.length,
-      total,
-      paymentCfg: {
-        hasBasePayload: !!paymentCfg.abaKhqrBasePayload,
-        merchantName: paymentCfg.displayMerchantName
-      }
-    });
-  }, [user, cart, total, paymentCfg]);
 
   const [busy, setBusy] = useState(false);
 
@@ -132,29 +117,23 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
 
       try {
         if (base) {
-          console.log('Generating QR with base payload and amount:', amount);
           const payload = buildAbaKhqrPayload({ basePayload: base, amount, dynamic: true });
-          console.log('Generated payload:', payload.substring(0, 50) + '...');
           const url = await QRCode.toDataURL(payload, { margin: 1, width: 320 });
           if (alive) {
             setQrDataUrl(url);
-            console.log('QR code generated successfully');
           }
           return;
         }
         if (alive) {
           setQrError('Payment QR is not configured yet. Please use Bank Transfer option below or contact support to set up QR payments.');
-          console.warn('No ABA KHQR base payload configured');
           
           // Try fallback static QR if available
           if (paymentCfg.abaQrImageUrl) {
             setQrDataUrl(paymentCfg.abaQrImageUrl);
             setQrError('');
-            console.log('Using fallback static QR image');
           }
         }
       } catch (e: any) {
-        console.error('QR generation error:', e);
         if (alive) setQrError(String(e?.message || 'Could not generate payment QR. Please try bank transfer instead.'));
       }
     };
@@ -185,8 +164,6 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   }, [expiresAt, nowMs]);
 
   const onPay = async (method: 'CARD' | 'PAYPAL' | 'BANK' | 'QR') => {
-    console.log('Starting payment process...', { method, user: !!user, cartLength: cart.length, total });
-
     if (method === 'CARD') {
       if (!cardName.trim() || !cardNumber.trim() || !expMonth.trim() || !expYear.trim() || !cvv.trim()) {
         setPaymentError('Please fill in card details before payment.');
@@ -259,9 +236,8 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
       hydrateCart([]);
       await clearUserCart(user.id);
 
-      navigate('/orders', { state: { toast: { message: 'Payment successful! Your order has been placed.', type: 'success' } } });
+      navigate('/', { state: { toast: { message: 'Payment successful! Your order has been placed.', type: 'success' } } });
     } catch (error: any) {
-      console.error('Payment error:', error);
       alert(`Payment error: ${error?.message || 'Something went wrong.'}`);
     } finally {
       setBusy(false);
@@ -358,7 +334,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
             {/* Cart Review Section */}
             <div className="bg-white rounded-2xl p-6 border border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold">1</span>
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white text-sm font-bold">1</span>
                 Order Review
               </h2>
               
@@ -398,7 +374,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
             {/* Payment Method Selection */}
             <div className="bg-white rounded-2xl p-6 border border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold">2</span>
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white text-sm font-bold">2</span>
                 Payment Method
               </h2>
               <p className="text-sm text-gray-500 mb-6 max-w-2xl">
@@ -414,14 +390,14 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}
-                      className={`group p-5 rounded-3xl border-2 transition-all text-left shadow-sm ${
+                      className={`group p-5 rounded-3xl border-2 transition-all duration-200 text-left shadow-sm ${
                         selected
                           ? 'border-indigo-600 bg-indigo-50/80 shadow-indigo-200'
                           : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${selected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${selected ? 'bg-indigo-600 text-white scale-110' : 'bg-gray-100 text-gray-600'}`}>
                           <Icon className="w-5 h-5" />
                         </span>
                         <div>
@@ -429,7 +405,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                           <div className="text-sm text-gray-500">{method.desc}</div>
                         </div>
                       </div>
-                      {selected && <div className="mt-4 text-sm text-indigo-600 font-medium">Selected</div>}
+                      {selected && <div className="mt-4 text-sm text-indigo-600 font-medium">✓ Selected</div>}
                     </button>
                   );
                 })}
@@ -453,7 +429,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     <input 
                       value={cardName} 
                       onChange={(e) => setCardName(e.target.value)} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200" 
                       placeholder="John Doe" 
                     />
                   </div>
@@ -485,54 +461,9 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     type="button"
                     onClick={() => onPay('CARD')}
                     disabled={busy || !isFormValid()}
-                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {busy ? 'Processing...' : `Pay ${fmtMoney(total)} with Card`}
-                  </button>
-                </div>
-              )}
-
-              {/* PayPal description and action */}
-              {paymentMethod === 'PAYPAL' && (
-                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
-                  <div className="rounded-3xl bg-white p-5 border border-gray-200">
-                    <div className="text-base font-semibold text-gray-900">PayPal Checkout</div>
-                    <p className="text-sm text-gray-500">You will be redirected to PayPal to complete your payment securely.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onPay('PAYPAL')}
-                    disabled={busy}
-                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {busy ? 'Processing...' : `Pay ${fmtMoney(total)} with PayPal`}
-                  </button>
-                </div>
-              )}
-
-              {/* QR Code Display */}
-              {paymentMethod === 'QR' && (
-                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
-                  <div className="text-center">
-                    {qrDataUrl ? (
-                      <div className="flex flex-col items-center">
-                        <img src={qrDataUrl} alt="ABA KHQR Payment Code" className="w-52 h-52 border-4 border-white rounded-3xl shadow-xl mb-4" />
-                        <div className="rounded-full bg-indigo-100 text-indigo-800 px-4 py-2 font-semibold mb-3">Expires in: {expiresText}</div>
-                        <p className="text-sm text-gray-600">Scan the QR code using your ABA mobile app to pay {fmtMoney(total)} instantly.</p>
-                      </div>
-                    ) : (
-                      <div className="py-8">
-                        <p className="text-gray-600 mb-3">{qrError || 'Generating QR Code...'}</p>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onPay('QR')}
-                    disabled={busy || !qrDataUrl}
-                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {busy ? 'Processing...' : `Confirm QR payment of ${fmtMoney(total)}`}
                   </button>
                 </div>
               )}
@@ -546,7 +477,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Bank Name</label>
-                    <input value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" placeholder="e.g., ABA" />
+                    <input value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200" placeholder="e.g., ABA" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Account Holder Name</label>
@@ -569,7 +500,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                     type="button"
                     onClick={onConfirmBankPayment}
                     disabled={busy}
-                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-bold hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {busy ? 'Processing...' : `Confirm Bank Transfer of ${fmtMoney(total)}`}
                   </button>
@@ -611,7 +542,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                 onClick={() => onPay(paymentMethod)}
                 disabled={busy || !isFormValid()}
                 title={!isFormValid() ? 'Please fill in all required fields' : ''}
-                className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 hover:disabled:scale-100 mb-4 flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-bold text-lg hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 hover:disabled:scale-100 mb-4 flex items-center justify-center gap-2"
               >
                 {busy ? (
                   <>
