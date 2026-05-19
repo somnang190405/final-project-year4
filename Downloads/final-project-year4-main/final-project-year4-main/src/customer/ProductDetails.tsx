@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -84,6 +84,22 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
   const discountedPrice = calcDiscountedUnitPrice(basePrice, promo);
   const imageSrc = (product as any).image || '';
 
+  const [selectedImage, setSelectedImage] = useState<string>('');
+
+  const galleryImages = useMemo(() => {
+    const images = [imageSrc];
+    if (Array.isArray((product as any).images)) {
+      images.push(...(product as any).images.filter(Boolean));
+    }
+    return Array.from(new Set(images.filter(Boolean))) as string[];
+  }, [product, imageSrc]);
+
+  useEffect(() => {
+    if (galleryImages.length) {
+      setSelectedImage((prev) => prev || galleryImages[0]);
+    }
+  }, [galleryImages]);
+
   const handleAdd = () => {
     if (!user) {
       onRequireAuth?.();
@@ -100,16 +116,16 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
     <div className="w-full mx-auto px-6 py-12">
       <div className="grid grid-cols-[minmax(420px,1fr)_1fr] gap-10">
         {/* Left: Image */}
-        <div className="w-full bg-gray-100 rounded-2xl overflow-hidden relative">
+        <div className="w-full rounded-3xl border border-gray-200 bg-white shadow-sm overflow-hidden">
           {hasPromo && (
-            <div className="absolute top-4 left-4 z-20 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-md">
+            <div className="absolute top-4 left-4 z-20 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
               -{formatPromotionPercentBadge(promo)}%
             </div>
           )}
-          <div className="aspect-[4/5] w-full bg-gray-100 flex items-center justify-center">
-            {imageSrc ? (
+          <div className="relative aspect-[4/5] w-full bg-gray-100 flex items-center justify-center overflow-hidden">
+            {selectedImage ? (
               <img
-                src={imageSrc}
+                src={selectedImage}
                 alt={product.name}
                 decoding="async"
                 className="w-full h-full object-cover"
@@ -122,6 +138,20 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
               <div className="text-sm text-slate-400">No image</div>
             )}
           </div>
+          {galleryImages.length > 1 && (
+            <div className="grid grid-cols-4 gap-3 p-4 bg-white">
+              {galleryImages.slice(0, 4).map((src, index) => (
+                <button
+                  key={`${src}-${index}`}
+                  type="button"
+                  onClick={() => setSelectedImage(src)}
+                  className={`overflow-hidden rounded-3xl border transition ${selectedImage === src ? 'border-black ring-2 ring-black/10' : 'border-gray-200 hover:border-gray-400'}`}
+                >
+                  <img src={src} alt={`${product.name} ${index + 1}`} className="h-20 w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: Details */}
@@ -145,9 +175,9 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
 
           {/* Delivery info bar */}
           <div className="mb-6">
-            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-              <CheckCircle2 size={18} className="text-green-600" />
-              <span>Orders over $50 get next‑day delivery.</span>
+            <div className="flex flex-wrap items-center gap-3 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+              <CheckCircle2 size={18} className="text-indigo-600" />
+              <span>Free delivery on orders over $100.</span>
             </div>
           </div>
 

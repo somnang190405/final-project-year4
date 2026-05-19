@@ -28,6 +28,14 @@ export const calcCartTotals = <T extends { price: number; promotionPercent?: unk
   };
 };
 
+export const FREE_DELIVERY_THRESHOLD = 100;
+export const DEFAULT_SHIPPING_FEE = 10;
+
+export const calcShippingFee = (subtotal: number): number => {
+  if (!Number.isFinite(subtotal)) return DEFAULT_SHIPPING_FEE;
+  return subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE;
+};
+
 export const formatPromotionPercentBadge = (promotionPercent?: unknown): string => {
   const p = normalizePromotionPercent(promotionPercent);
   return String(Math.round(p));
