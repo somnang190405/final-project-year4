@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useMemo } from "react";
 import { CartItem } from "../../types";
+import { calcCartTotals } from "../../services/pricing";
 
 interface CartContextType {
   cart: CartItem[];
@@ -7,6 +8,13 @@ interface CartContextType {
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   hydrateCart: (items: CartItem[]) => void;
+  // reactive computed values
+  originalSubtotal: number;
+  discountedSubtotal: number;
+  discountTotal: number;
+  shippingFee: number;
+  total: number;
+  freeShippingEligible: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -69,8 +77,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCart(items);
   };
 
+  const {
+    originalSubtotal,
+    discountedSubtotal,
+    discountTotal,
+    shippingFee,
+    total,
+    freeShippingEligible,
+  } = useMemo(() => calcCartTotals(cart), [cart]);
+
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, hydrateCart }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, hydrateCart, originalSubtotal, discountedSubtotal, discountTotal, shippingFee, total, freeShippingEligible }}>
       {children}
     </CartContext.Provider>
   );

@@ -484,6 +484,29 @@
   line-height: 1.4;
 }
 
+/* Dropzone styles for Add Product */
+.dropzone {
+  border: 2px dashed #e6e8eb;
+  border-radius: 12px;
+  padding: 28px;
+  background: rgba(248,250,252,0.6); /* bg-slate-50/50 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.dropzone:hover { border-color: #667eea; background: rgba(240,244,255,0.7); }
+.dropzone-empty .dropzone-icon { font-size: 34px; margin-bottom: 8px; }
+.dropzone-empty .dropzone-title { font-weight: 700; color: #111827; }
+.dropzone-empty .dropzone-sub { color: #6b7280; margin-top: 6px; }
+
+.preview-grid { display: flex; gap: 12px; align-items: center; }
+.preview-item { position: relative; width: 96px; height: 96px; border-radius: 12px; overflow: hidden; border: 1px solid #e6e8eb; }
+.preview-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.preview-remove { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.9); border: 0; border-radius: 999px; padding: 4px 6px; cursor: pointer; }
+
 .image-input-options { 
   display: flex; 
   gap: 16px; 

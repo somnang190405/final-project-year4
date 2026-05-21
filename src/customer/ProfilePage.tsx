@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getUserFromFirestore, updateUser, uploadUserAvatar } from '../services/firestoreService';
+import { getUserFromFirestore, updateUser } from '../services/firestoreService';
 import { User as TUser } from '../types';
 import { useNavigate, Link } from 'react-router-dom';
-import { Camera, Check, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { formatUserIdFromUid } from '../utils/formatIds';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = ({ onRequireAuth }) => {
@@ -12,7 +13,9 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Editable form state (must be declared unconditionally to obey React hook rules)
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Editable form state
   const initialForm = useMemo(() => {
     const u = user;
     return {
@@ -30,19 +33,13 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
-  // Keep form in sync when user loads/refreshes.
   useEffect(() => {
     setForm(initialForm);
-    setAvatarPreview(user?.avatar || null);
-    setAvatarFile(null);
     setSavedMsg(null);
     setError(null);
-    // Auto-expand "More details" if user already has optional info saved.
     setShowMore(Boolean(initialForm.dateOfBirth));
-  }, [initialForm, user?.avatar]);
+  }, [initialForm]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
@@ -104,9 +101,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
 
   const parseDobToISO = (input: string) => {
     const v = input.trim();
-    // accept YYYY-MM-DD directly
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    // accept DD/MM/YYYY
     const m = v.match(/^([0-3]?\d)\/([0-1]?\d)\/(\d{4})$/);
     if (m) {
       const dd = m[1].padStart(2, '0');
@@ -114,7 +109,7 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
       const yyyy = m[3];
       return `${yyyy}-${mm}-${dd}`;
     }
-    return v; // fallback store raw
+    return v;
   };
 
   const save = async () => {
@@ -134,23 +129,12 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
         phoneNumber: form.phoneNumber,
         dateOfBirth: parseDobToISO(form.dateOfBirth),
       };
-      if (avatarFile) {
-        try {
-          const avatarUrl = await uploadUserAvatar(avatarFile, user.id);
-          updatedFields.avatar = avatarUrl;
-        } catch (uploadError) {
-          console.error('Avatar upload failed', uploadError);
-          setSavedMsg('Failed to upload avatar. Please try again.');
-          setError(String(uploadError));
-          return;
-        }
-      }
 
       await updateUser(user.id, updatedFields);
       setSavedMsg('Profile updated successfully!');
-      // refresh local user object
       const refreshed = await getUserFromFirestore(user.id);
       if (refreshed) setUser(refreshed);
+      setIsEditing(false);
     } catch (e) {
       setSavedMsg('Failed to save profile');
       setError(String(e));
@@ -159,189 +143,154 @@ const ProfilePage: React.FC<{ onRequireAuth?: (redirectTo: string) => void }> = 
     }
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      setAvatarFile(file);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="profile-header-card mb-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="profile-header-card mb-8 flex items-center justify-between">
           <div>
             <h3 className="profile-page-title">Your Profile</h3>
             <p className="profile-page-subtitle">Update your account information and keep your profile current.</p>
           </div>
-        </div>
-
-
-        {/* Section 1: Basic Information */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">1</span>
-            Basic Information
-          </h2>
-          
-          {/* Gender Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-900 mb-3">Gender (required)</label>
-            <div className="flex gap-3 flex-wrap">
-              {(['Male', 'Female', 'Other'] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setForm({ ...form, gender: g })}
-                  className={`px-6 py-3 rounded-full border-2 text-sm font-semibold transition-all transform hover:scale-105 ${
-                    form.gender === g
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-900 border-gray-300 hover:border-indigo-400'
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Name Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">First Name</label>
-              <input
-                value={form.firstName}
-                onChange={onChange('firstName')}
-                placeholder="John"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Last Name</label>
-              <input
-                value={form.lastName}
-                onChange={onChange('lastName')}
-                placeholder="Doe"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
+          <div className="flex items-center gap-3">
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+              >
+                Edit Profile
+              </button>
+            ) : (
+              <button
+                onClick={() => { setIsEditing(false); setForm(initialForm); }}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 font-semibold hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Section 2: Contact Information */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">2</span>
-            Contact Information
-          </h2>
-
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Email Address</label>
-              <input
-                value={form.email}
-                readOnly
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-2">Email cannot be changed</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Mobile Number</label>
-              <input
-                value={form.phoneNumber}
-                onChange={onChange('phoneNumber')}
-                placeholder="+1 (555) 123-4567"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Additional Details (expandable) */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className="w-full px-8 py-6 flex items-center justify-between hover:bg-gray-50 transition"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <span className="flex items-center justify-center w-10 h-10 rounded-full bg-black text-white font-bold text-sm">3</span>
-              Additional Details
-            </h2>
-            <svg className={`w-6 h-6 text-indigo-600 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </button>
-
-          {showMore && (
-            <div className="px-8 py-6 border-t border-gray-200 bg-gray-50">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Avatar & Summary Card */}
+          <aside className="lg:col-span-1">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Date of Birth</label>
-                <input
-                  value={form.dateOfBirth}
-                  onChange={onChange('dateOfBirth')}
-                  placeholder="YYYY-MM-DD or DD/MM/YYYY"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                />
-                <p className="text-xs text-gray-500 mt-2">Format: YYYY-MM-DD or DD/MM/YYYY</p>
+                <div className="text-sm uppercase tracking-[0.24em] text-indigo-600 font-semibold mb-2">Profile Details</div>
+                <h4 className="text-2xl font-semibold text-gray-900">{user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim()}</h4>
+                <p className="text-sm text-gray-500 mt-2">{user.email}</p>
+              </div>
+
+              <div className="rounded-3xl bg-slate-50 p-5 space-y-3 text-sm text-slate-700">
+                <div className="flex justify-between gap-4">
+                  <span className="font-semibold text-slate-900">User ID</span>
+                  <span>{formatUserIdFromUid(user.id)}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="font-semibold text-slate-900">Role</span>
+                  <span>{user.role}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="font-semibold text-slate-900">Status</span>
+                  <span>Active</span>
+                </div>
               </div>
             </div>
-          )}
-        </div>
+          </aside>
 
-        {/* Messages */}
-        {error && (
-          <div className="mt-8 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+          {/* Right: Form or View */}
+          <section className="lg:col-span-2">
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm transition-all">
+              {/* Row: Name / Gender */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-center">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Full Name</label>
+                  {!isEditing ? (
+                    <div className="text-gray-700">{user.name || `${user.firstName || ''} ${user.lastName || ''}`}</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        value={form.firstName}
+                        onChange={onChange('firstName')}
+                        placeholder="First"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                      />
+                      <input
+                        value={form.lastName}
+                        onChange={onChange('lastName')}
+                        placeholder="Last"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Gender</label>
+                  {!isEditing ? (
+                    <div className="text-gray-700">{user.gender || '—'}</div>
+                  ) : (
+                    <select value={form.gender} onChange={onChange('gender')} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white outline-none">
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {/* Contact Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Email</label>
+                  <div className="text-gray-700">{user.email}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Mobile</label>
+                  {!isEditing ? (
+                    <div className="text-gray-700">{user.phoneNumber || '—'}</div>
+                  ) : (
+                    <input value={form.phoneNumber} onChange={onChange('phoneNumber')} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                  )}
+                </div>
+              </div>
+
+              {/* Additional */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Date of Birth</label>
+                {!isEditing ? (
+                  <div className="text-gray-700">{user.dateOfBirth || '—'}</div>
+                ) : (
+                  <input value={form.dateOfBirth} onChange={onChange('dateOfBirth')} placeholder="YYYY-MM-DD" className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-2 text-sm text-red-600">{error}</div>
+              )}
+
+              {savedMsg && (
+                <div className={`mt-4 p-4 rounded-lg ${savedMsg.includes('successfully') ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className="text-sm">{savedMsg}</div>
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center gap-3">
+                {!isEditing ? (
+                  <Link to="/orders" className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 font-semibold hover:bg-gray-200 transition">View Orders</Link>
+                ) : (
+                  <>
+                    <button onClick={save} disabled={saving} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-95 transition">
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button onClick={() => { setIsEditing(false); setForm(initialForm); }} className="px-5 py-3 rounded-lg bg-gray-100 text-gray-800 font-semibold hover:bg-gray-200 transition">Cancel</button>
+                  </>
+                )}
+              </div>
+
             </div>
-          </div>
-        )}
-
-        {savedMsg && (
-          <div className={`mt-8 border-l-4 p-4 rounded-lg flex items-start gap-3 ${
-            savedMsg.includes('successfully')
-              ? 'bg-emerald-50 border-emerald-500'
-              : 'bg-red-50 border-red-500'
-          }`}>
-            {savedMsg.includes('successfully') ? (
-              <Check className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-            )}
-            <div>
-              <h3 className={`font-semibold ${savedMsg.includes('successfully') ? 'text-emerald-900' : 'text-red-900'}`}>
-                {savedMsg.includes('successfully') ? 'Success' : 'Error'}
-              </h3>
-              <p className={`text-sm mt-1 ${savedMsg.includes('successfully') ? 'text-emerald-700' : 'text-red-700'}`}>
-                {savedMsg}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="profile-actions">
-          <button
-            onClick={save}
-            disabled={saving}
-            className="btn btn-primary"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <Link
-            to="/orders"
-            className="btn btn-secondary"
-          >
-            Cancel
-          </Link>
+          </section>
         </div>
 
         <p className="mt-6 text-center text-sm text-gray-500">

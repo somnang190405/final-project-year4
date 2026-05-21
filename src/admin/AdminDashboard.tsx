@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { listenProducts, listenOrders, createProduct, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists } from "../services/firestoreService";
-import { firebaseApp } from "../services/firebase";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { listenProducts, listenOrders, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists } from "../services/firestoreService";
+import { supabase } from "../../scripts/supabaseClient";
 import { Product, Order, OrderStatus } from "../types";
 import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
@@ -12,7 +11,6 @@ import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashb
 import { auth } from "../services/firebase";
 
 const AdminDashboard: React.FC = () => {
-  const storage = React.useMemo(() => getStorage(firebaseApp), []);
   const navigate = useNavigate();
   
   const handleLogout = async () => {
@@ -66,6 +64,7 @@ const AdminDashboard: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageFileName, setImageFileName] = useState<string>("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -119,6 +118,7 @@ const AdminDashboard: React.FC = () => {
       setImagePreviewUrl(null);
       return;
     }
+    console.log('Creating preview for file:', imageFile.name);
     const url = URL.createObjectURL(imageFile);
     setImagePreviewUrl(url);
     return () => {
@@ -132,6 +132,58 @@ const AdminDashboard: React.FC = () => {
       unsubCategories && unsubCategories();
     };
   }, []);
+
+  const parseOrderTimestamp = (order: Order): number | null => {
+    const raw = order.paidAt || order.date || '';
+    const parsed = Date.parse(String(raw));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const dashboardMetrics = React.useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Array.from({ length: 7 }, (_, idx) => {
+      const current = new Date(start);
+      current.setDate(start.getDate() - (6 - idx));
+      return current;
+    });
+
+    const trend = days.map((day) => {
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      const dayRevenue = orders.reduce((sum, order) => {
+        const ts = parseOrderTimestamp(order);
+        if (!ts) return sum;
+        if (ts >= dayStart.getTime() && ts <= dayEnd.getTime()) {
+          return sum + (Number(order.total) || 0);
+        }
+        return sum;
+      }, 0);
+      return {
+        label: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: dayRevenue,
+      };
+    });
+
+    const totalRevenue = orders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
+    const paidRevenue = orders.reduce((sum, order) => {
+      const isPaid = order.paymentStatus === 'PAID' || order.status === OrderStatus.DELIVERED;
+      return sum + (isPaid ? (Number(order.total) || 0) : 0);
+    }, 0);
+    const pendingReturns = orders.filter((order) => order.returnRequest?.status === 'Requested').length;
+    const activeOrders = orders.filter((order) => order.status !== OrderStatus.CANCELLED).length;
+
+    return {
+      totalOrders: orders.length,
+      activeOrders,
+      totalRevenue,
+      paidRevenue,
+      pendingReturns,
+      trend,
+    };
+  }, [orders]);
 
   // Image compression function
   const downscaleImage = async (
@@ -160,29 +212,33 @@ const AdminDashboard: React.FC = () => {
     ctx.drawImage(bitmap as any, 0, 0, canvas.width, canvas.height);
 
     let quality = qualityStart;
-    let blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/jpeg', quality));
+    let blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (!blob) {
+      throw new Error('Failed to compress image');
+    }
     while (blob.size > targetMaxBytes && quality > 0.1) {
       quality -= 0.1;
-      blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/jpeg', quality));
+      const nextBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!nextBlob) {
+        throw new Error('Failed to compress image');
+      }
+      blob = nextBlob;
     }
     return blob;
   };
 
-  // Upload image to Firebase Storage with improved error handling
-  const uploadToStorage = async (file: File): Promise<string> => {
+  // Upload image to Supabase Storage with improved error handling
+  const uploadProductImage = async (file: File): Promise<string> => {
     try {
-      // Validate file
       if (!file) {
         throw new Error('No file selected');
       }
 
-      // Check file type
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!validTypes.includes(file.type)) {
         throw new Error(`Invalid file type. Allowed types: ${validTypes.join(', ')}`);
       }
 
-      // Check file size (5MB max before compression)
       const maxSizeMB = 5;
       if (file.size > maxSizeMB * 1024 * 1024) {
         throw new Error(`File size exceeds ${maxSizeMB}MB limit`);
@@ -190,72 +246,97 @@ const AdminDashboard: React.FC = () => {
 
       console.log('Starting image upload...', { fileName: file.name, fileSize: file.size, fileType: file.type });
 
-      // Compress image
       const compressedBlob = await downscaleImage(file);
       console.log('Image compressed:', { compressedSize: compressedBlob.size });
 
-      // Create safe filename
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`;
-      const storageRef = ref(storage, `products/${uniqueName}`);
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').replace(/_+/g, '_');
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}.jpg`;
+      const filePath = `products/${fileName}`;
 
-      console.log('Uploading to Firebase Storage...', { storageRef: storageRef.fullPath });
+      setUploadProgress(0);
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, compressedBlob, {
+          contentType: 'image/jpeg',
+        });
 
-      const uploadTask = uploadBytesResumable(storageRef, compressedBlob, {
-        contentType: 'image/jpeg',
-        cacheControl: 'public, max-age=31536000',
-      });
+      if (error || !data) {
+        throw error || new Error('Supabase upload failed');
+      }
 
-      return new Promise((resolve, reject) => {
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            console.log('Upload progress:', { progress, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
-            setUploadProgress(progress);
-          },
-          (error: any) => {
-            console.error('Image upload failed:', {
-              code: error.code,
-              message: error.message,
-              details: error
-            });
-            setUploadProgress(null);
+      const { data: publicUrlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
 
-            // Provide user-friendly error messages
-            let errorMsg = 'Failed to upload image. ';
-            if (error.code === 'storage/unauthorized') {
-              errorMsg += 'You do not have permission to upload images. Please contact an administrator.';
-            } else if (error.code === 'storage/canceled') {
-              errorMsg += 'Upload was canceled.';
-            } else if (error.code === 'storage/unknown') {
-              errorMsg += 'An unknown error occurred. Please check your internet connection and try again.';
-            } else {
-              errorMsg += error.message || 'Unknown error';
-            }
+      if (!publicUrlData?.publicUrl) {
+        throw new Error('Failed to get public image URL');
+      }
 
-            setUploadError(errorMsg);
-            reject(new Error(errorMsg));
-          },
-          async () => {
-            try {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              console.log('Upload successful:', { downloadURL });
-              resolve(downloadURL);
-            } catch (error: any) {
-              console.error('Failed to get download URL:', error);
-              reject(new Error('Upload completed but failed to get image URL: ' + error.message));
-            }
-          }
-        );
-      });
+      setUploadProgress(100);
+      setUploadError(null);
+      console.log('Upload successful:', { publicUrl: publicUrlData.publicUrl });
+      return publicUrlData.publicUrl;
     } catch (error: any) {
-      const message = error?.message || 'Failed to process upload.';
-      console.error('Upload preprocessing error:', error);
+      let message = error?.message || 'Failed to process upload.';
+      if (message.includes('ERR_FAILED') || message.includes('NetworkError') || message.includes('CORS')) {
+        message = 'Upload blocked by browser network policy. Check your Supabase storage bucket and public URL settings.';
+      }
       setUploadProgress(null);
       setUploadError(message);
       throw error;
     }
+  };
+
+  // Dropzone and file handlers for Add Product image upload
+  const handleFileInputChange = (file?: File | null) => {
+    if (!file) return;
+    console.log('File selected:', { name: file.name, size: file.size, type: file.type });
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      console.warn('Invalid file type:', file.type);
+      setUploadError('Invalid file type. Allowed: PNG, JPG, WebP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      console.warn('File too large:', file.size);
+      setUploadError('File too large. Max 5MB');
+      return;
+    }
+    console.log('File validation passed, setting state');
+    setUploadError(null);
+    setImageFile(file);
+    setImageFileName(file.name);
+    setImageMode('upload');
+  };
+
+  const handleFileInputClick = () => {
+    console.log('File input clicked');
+    fileInputRef.current?.click();
+  };
+
+  const resetFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) handleFileInputChange(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImageFileName("");
+    setImagePreviewUrl(null);
+    setUploadProgress(null);
+    setUploadError(null);
+    resetFileInput();
   };
 
   // Handle delete product
@@ -274,24 +355,38 @@ const AdminDashboard: React.FC = () => {
   // Handle create product
   const handleCreateProduct = async () => {
     setFormErrors({});
-    if (!newProduct.name.trim()) {
+
+    const productName = newProduct.name.trim();
+    const productCategory = newProduct.category.trim();
+    const productSubcategory = newProduct.subcategory.trim();
+    const productDescription = newProduct.description.trim();
+    const productPrice = Number(newProduct.price);
+    const productStock = Number(newProduct.stock);
+    const productPromotionPercent = Number(newProduct.promotionPercent);
+    const productIsFeatured = Boolean(newProduct.isNewArrival);
+
+    if (!productName) {
       setFormErrors(prev => ({ ...prev, name: "Product name is required" }));
       return;
     }
-    if (newProduct.price <= 0) {
-      setFormErrors(prev => ({ ...prev, price: "Price must be greater than 0" }));
+    if (Number.isNaN(productPrice) || productPrice <= 0) {
+      setFormErrors(prev => ({ ...prev, price: "Price must be a valid number greater than 0" }));
       return;
     }
-    if (newProduct.stock < 0) {
-      setFormErrors(prev => ({ ...prev, stock: "Stock cannot be negative" }));
+    if (Number.isNaN(productStock) || productStock < 0) {
+      setFormErrors(prev => ({ ...prev, stock: "Stock must be a valid non-negative number" }));
       return;
     }
-    if (!newProduct.category) {
+    if (!productCategory) {
       setFormErrors(prev => ({ ...prev, category: "Category is required" }));
       return;
     }
-    if (!newProduct.subcategory) {
+    if (!productSubcategory) {
       setFormErrors(prev => ({ ...prev, subcategory: "Subcategory is required" }));
+      return;
+    }
+    if (!productDescription) {
+      setFormErrors(prev => ({ ...prev, description: "Description is required" }));
       return;
     }
     if (!newProduct.image && !imageFile) {
@@ -303,16 +398,72 @@ const AdminDashboard: React.FC = () => {
     try {
       let imageUrl = newProduct.image;
       if (imageMode === 'upload' && imageFile) {
-        imageUrl = await uploadToStorage(imageFile);
+        imageUrl = await uploadProductImage(imageFile);
       }
 
-      await createProduct({
-        ...newProduct,
-        image: imageUrl,
-      });
+      if (!imageUrl) {
+        throw new Error('Image URL could not be generated. Please try again.');
+      }
 
-      // Add category if it doesn't exist
-      await addCategoryIfNotExists(newProduct.category);
+      type SupabaseProductRow = {
+        id: number;
+        name: string;
+        price: number;
+        stock: number;
+        category: string;
+        subcategory: string;
+        promotion_percent: number;
+        is_featured: boolean;
+        description: string;
+        image_url: string;
+        created_at: string;
+      };
+
+      const payload: Omit<SupabaseProductRow, 'id' | 'created_at'> & { created_at: string } = {
+        name: productName,
+        price: productPrice,
+        stock: productStock,
+        category: productCategory,
+        subcategory: productSubcategory,
+        promotion_percent: Math.round(productPromotionPercent),
+        is_featured: productIsFeatured,
+        description: productDescription,
+        image_url: imageUrl,
+        created_at: new Date().toISOString(),
+      };
+
+      const response = await supabase
+        .from('products')
+        .insert<SupabaseProductRow>([payload])
+        .select();
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      const data = response.data as SupabaseProductRow[] | null;
+      if (!data || data.length === 0) {
+        throw new Error('No product was inserted.');
+      }
+
+      const insertedRow = data[0];
+      const insertedProduct: Product = {
+        id: String(insertedRow.id ?? Date.now()),
+        name: insertedRow.name,
+        price: Number(insertedRow.price),
+        promotionPercent: Number(insertedRow.promotion_percent) || 0,
+        category: insertedRow.category,
+        subcategory: insertedRow.subcategory,
+        image: insertedRow.image_url,
+        description: insertedRow.description,
+        stock: Number(insertedRow.stock),
+        rating: 0,
+        isNewArrival: productIsFeatured,
+        colors: [],
+      };
+
+      setProducts((prev) => [...prev, insertedProduct]);
+      await addCategoryIfNotExists(productCategory);
 
       setNewProduct({
         name: "",
@@ -338,7 +489,10 @@ const AdminDashboard: React.FC = () => {
       setTimeout(() => setToast(null), 3000);
     } catch (error: any) {
       console.error("Error creating product:", error);
-      const message = error?.message || "Failed to create product. Please try again.";
+      let message = error?.message || "Failed to create product. Please try again.";
+      if (message.includes('row-level security')) {
+        message = 'Insert blocked by Supabase row-level security. Add an insert policy for the products table or use a server-side insert path.';
+      }
       setUploadError(message);
       setToast({ message, type: "error" });
       setTimeout(() => setToast(null), 3000);
@@ -382,7 +536,7 @@ const AdminDashboard: React.FC = () => {
     try {
       let imageUrl = updatedProduct.image;
       if (editImageMode === 'upload' && imageFile) {
-        imageUrl = await uploadToStorage(imageFile);
+        imageUrl = await uploadProductImage(imageFile);
       }
 
       await updateProduct(editTarget.id, {
@@ -497,7 +651,7 @@ const AdminDashboard: React.FC = () => {
         <div className="brand">
           <span className="brand-icon" aria-hidden="true"><ShieldCheck size={18} /></span>
           <button type="button" onClick={goHome} className="brand-name brand-button" style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>
-            Back Home
+            TinhMe Dashboard
           </button>
         </div>
         <nav className="side-nav">
@@ -546,37 +700,63 @@ const AdminDashboard: React.FC = () => {
 
         {activeView === "dashboard" && (
           <div className="overview-grid">
-            <div className="card metric">
-              <div className="metric-icon">📦</div>
-              <div>
-                <div className="metric-label">Total Products</div>
-                <div className="metric-value">{products.length}</div>
+            <div className="card">
+              <div className="metric">
+                <span className="metric-icon"><ShoppingCart size={24} /></span>
+                <div>
+                  <div className="metric-label">Total Orders</div>
+                  <div className="metric-value">{dashboardMetrics.totalOrders}</div>
+                </div>
               </div>
             </div>
-            <div className="card metric">
-              <div className="metric-icon">🧾</div>
-              <div>
-                <div className="metric-label">Total Orders</div>
-                <div className="metric-value">{orders.length}</div>
+            <div className="card">
+              <div className="metric">
+                <span className="metric-icon"><UsersIcon size={24} /></span>
+                <div>
+                  <div className="metric-label">Active Orders</div>
+                  <div className="metric-value">{dashboardMetrics.activeOrders}</div>
+                </div>
               </div>
             </div>
-            <div className="card metric">
-              <div className="metric-icon">⏳</div>
-              <div>
-                <div className="metric-label">Pending Orders</div>
-                <div className="metric-value">{orders.filter(o => o.status === OrderStatus.PENDING).length}</div>
+            <div className="card">
+              <div className="metric">
+                <span className="metric-icon"><Home size={24} /></span>
+                <div>
+                  <div className="metric-label">Revenue</div>
+                  <div className="metric-value">${dashboardMetrics.totalRevenue.toFixed(2)}</div>
+                </div>
               </div>
             </div>
-            <div className="card metric">
-              <div className="metric-icon">💰</div>
-              <div>
-                <div className="metric-label">Total Revenue</div>
-                <div className="metric-value">${orders.reduce((sum, o) => sum + (o.total || 0), 0).toFixed(2)}</div>
+            <div className="card">
+              <div className="metric">
+                <span className="metric-icon"><Package size={24} /></span>
+                <div>
+                  <div className="metric-label">Pending Returns</div>
+                  <div className="metric-value">{dashboardMetrics.pendingReturns}</div>
+                </div>
               </div>
+            </div>
+            <div className="card" style={{ gridColumn: 'span 2' }}>
+              <div className="card-title">Revenue Trend (last 7 days)</div>
+              {dashboardMetrics.trend.every((point) => point.revenue === 0) ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748b' }}>No revenue data for the last 7 days.</div>
+              ) : (
+                <div className="bar-chart">
+                  {dashboardMetrics.trend.map((point) => {
+                    const max = Math.max(...dashboardMetrics.trend.map((item) => item.revenue), 1);
+                    const height = Math.round((point.revenue / max) * 100);
+                    return (
+                      <div key={point.label} className="bar">
+                        <div className="bar-fill" style={{ height: `${height}%` }} title={`$${point.revenue.toFixed(2)}`} />
+                        <div className="bar-label">{point.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
-
         {activeView === "products" && (
           <section className="products-section">
             <div className="section-header">
@@ -914,32 +1094,82 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Image URL *</label>
+                      <label className="form-label">Product Images *</label>
 
-                      <div className="image-input-container">
-                        <input
-                          type="url"
-                          className="input"
-                          value={newProduct.image}
-                          onChange={(e) =>
-                            setNewProduct((prev) => ({ ...prev, image: e.target.value }))
-                          }
-                          placeholder="https://example.com/image.jpg"
-                        />
-
-                        {/* Show preview only if a URL is entered */}
-                        {newProduct.image && (
-                          <div className="image-preview-container">
-                            <img
-                              src={newProduct.image}
-                              alt="Image preview"
-                              className="image-preview"
-                              // Optional: handle broken links
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                          </div>
-                        )}
+                      <div className="image-input-options">
+                        <label>
+                          <input type="radio" name="imageMode" checked={imageMode === 'url'} onChange={() => setImageMode('url')} />
+                          <span className="ml-2">Use URL</span>
+                        </label>
+                        <label>
+                          <input type="radio" name="imageMode" checked={imageMode === 'upload'} onChange={() => setImageMode('upload')} />
+                          <span className="ml-2">Upload</span>
+                        </label>
                       </div>
+
+                      {imageMode === 'upload' ? (
+                        <div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileInputChange(f); }}
+                            style={{ display: 'none' }}
+                          />
+                          <div
+                            className="dropzone"
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onClick={handleFileInputClick}
+                            style={{ cursor: 'pointer' }}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleFileInputClick(); }}
+                          >
+                            <div className="dropzone-inner">
+                              <div className="upload-icon" style={{ fontSize: 30, color: '#667eea' }}>⬆</div>
+                              <div className="upload-title" style={{ fontWeight: 700, color: '#111827' }}>Click to upload or drag and drop</div>
+                              <div className="upload-sub" style={{ color: '#6b7280', marginTop: 6 }}>PNG, JPG, WebP up to 5MB</div>
+                            </div>
+                          </div>
+
+                          {uploadError && <div className="upload-error-banner">{uploadError}</div>}
+
+                          {imageFile && imagePreviewUrl && (
+                            <div className="mt-4 grid grid-cols-4 gap-3">
+                              <div className="relative w-24 h-24 rounded-lg overflow-hidden border">
+                                <img src={imagePreviewUrl} alt="preview" className="w-full h-full object-cover" />
+                                <button type="button" onClick={handleRemoveImage} className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-sm">✕</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="image-input-container">
+                          <input
+                            type="url"
+                            className="input"
+                            value={newProduct.image}
+                            onChange={(e) =>
+                              setNewProduct((prev) => ({ ...prev, image: e.target.value }))
+                            }
+                            placeholder="https://example.com/image.jpg"
+                          />
+
+                          {/* Show preview only if a URL is entered */}
+                          {newProduct.image && (
+                            <div className="image-preview-container">
+                              <img
+                                src={newProduct.image}
+                                alt="Image preview"
+                                className="image-preview"
+                                // Optional: handle broken links
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {formErrors.image && (
                         <span className="field-error">{formErrors.image}</span>

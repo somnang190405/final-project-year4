@@ -9,9 +9,10 @@
 /* Card/Table */
 .card {
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  border: 1px solid #f1f5f9; /* border-slate-100 */
+  border-radius: 12px; /* rounded-xl feel */
+  padding: 18px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06); /* subtle shadow */
 }
 .om-table { width: 100%; overflow: hidden; }
 .om-row { 
@@ -51,7 +52,7 @@
 .btn { 
   border: 1px solid transparent; 
   border-radius: 10px; 
-  padding: 9px 12px; 
+  padding: 10px 16px; 
   font-size: 13px; 
   font-weight: 600; 
   cursor: pointer; 
@@ -64,6 +65,8 @@
 .btn.success:hover { background: #15803d; }
 .btn.danger { background: #ef4444; color: #fff; }
 .btn.danger:hover { background: #dc2626; }
+.btn.secondary { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.btn.secondary:hover { background: #e5e7eb; }
 
 /* Tabs */
 .tabs {
@@ -111,11 +114,11 @@
   gap: 16px;
 }
 .return-card {
-  padding: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 24px; /* p-6 equivalent */
+  border: 1px solid #f1f5f9;
+  border-radius: 16px; /* rounded-xl */
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15,23,42,0.04);
 }
 .return-header {
   display: flex;
@@ -170,17 +173,19 @@
 }
 .comment-input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: 14px;
+  border: 1px solid #e6e8eb;
+  border-radius: 12px;
   font-size: 14px;
   margin-bottom: 12px;
   resize: vertical;
+  min-height: 100px;
+  background: #fbfdff;
 }
 .comment-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
 }
 .form-actions {
   display: flex;
@@ -193,11 +198,92 @@
   align-items: center;
 }
 
-/* Status badges for returns */
-.status-badge.requested { background: #fef3c7; color: #92400e; }
-.status-badge.approved { background: #dbeafe; color: #1e40af; }
-.status-badge.declined { background: #fee2e2; color: #7f1d1d; }
-.status-badge.completed { background: #dcfce7; color: #166534; }
+/* Status badge base */
+.status-badge {
+  display: inline-block;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+/* Requested / Pending: amber */
+.status-badge.requested { background: #fffbeb; color: #92400e; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
+/* Approved / Completed: emerald */
+.status-badge.approved, .status-badge.completed { background: #ecfdf5; color: #166534; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
+/* Declined / Cancelled: rose */
+.status-badge.declined, .status-badge.cancelled { background: #fff1f2; color: #9f1239; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(15,23,42,0.4); /* slate-900/40 */
+  backdrop-filter: blur(6px); /* backdrop-blur-sm feel */
+}
+.modal-card {
+  width: min(520px, calc(100% - 32px));
+  border-radius: 24px;
+  padding: 0;
+  overflow: hidden;
+  transform: translateY(-10px);
+  opacity: 0;
+  animation: modal-pop 210ms ease-out forwards;
+}
+.modal-card.modal-success {
+  border: 1px solid #dbeafe;
+  background: #ffffff;
+}
+.modal-card.modal-danger {
+  border: 1px solid #fee2e2;
+  background: #ffffff;
+}
+.modal-content {
+  padding: 32px;
+}
+.modal-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  background: #f3f4ff;
+  color: #4338ca;
+  font-size: 24px;
+  margin-bottom: 18px;
+}
+.modal-card.modal-danger .modal-icon {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 10px 0;
+}
+.modal-text {
+  color: #475569;
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn.confirm {
+  background: #4338ca;
+  color: #fff;
+}
+.btn.confirm:hover {
+  background: #3730a3;
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* Responsive */
 @media (max-width: 768px) {

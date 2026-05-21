@@ -1,21 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { getAllOrders, updateOrderStatus, updateOrderReturnRequest } from "../services/firestoreService";
+import { getAllOrders, updateOrderStatus, updateOrderReturnRequest, getAllUsers } from "../services/firestoreService";
 import { Order, OrderStatus } from "../types";
+import { formatOrderId } from '../utils/formatIds';
+import Modal from '../components/Modal';
 import './OrderManagement.css';
 
 const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string,string>>({});
   const [activeTab, setActiveTab] = useState<'orders' | 'returns'>('orders');
   const [returnComment, setReturnComment] = useState('');
   const [activeReturnOrder, setActiveReturnOrder] = useState<string | null>(null);
   const [returnBusy, setReturnBusy] = useState(false);
+  const [pendingReturnAction, setPendingReturnAction] = useState<{ orderId: string; status: 'Approved' | 'Declined' } | null>(null);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchAll = async () => {
       const fetchedOrders = await getAllOrders();
       setOrders(fetchedOrders);
+      try {
+        const users = await getAllUsers();
+        const map: Record<string,string> = {};
+        users.forEach(u => { map[u.id] = u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || u.id; });
+        setUsersMap(map);
+      } catch (e) {
+        console.warn('Failed to load users for order display', e);
+      }
     };
-    fetchOrders();
+    fetchAll();
   }, []);
 
   const handleUpdateStatus = async (id: string, status: OrderStatus) => {
@@ -44,6 +56,20 @@ const OrderManagement: React.FC = () => {
     } finally {
       setReturnBusy(false);
     }
+  };
+
+  const confirmPendingReturnAction = async () => {
+    if (!pendingReturnAction) return;
+    await handleUpdateReturnRequest(pendingReturnAction.orderId, pendingReturnAction.status, returnComment);
+    setPendingReturnAction(null);
+  };
+
+  const mapOrderStatusToBadge = (status: string) => {
+    const s = String(status).toLowerCase();
+    if (s.includes('cancel') || s.includes('declin')) return 'declined';
+    if (s.includes('deliver') || s.includes('complete') || s.includes('approved')) return 'approved';
+    // shipped, pending, requested
+    return 'requested';
   };
 
   const ordersWithReturns = orders.filter(order => order.returnRequest?.status);
@@ -76,29 +102,31 @@ const OrderManagement: React.FC = () => {
             <span>Status</span>
             <span>Actions</span>
           </div>
-          {regularOrders.map((order) => {
+          {regularOrders.map((order, idx) => {
             const canShip = order.status === OrderStatus.PENDING;
             const canDeliver = order.status === OrderStatus.SHIPPED;
             const canCancel = order.status === OrderStatus.PENDING;
             const totalText = typeof (order as any).total === 'number' ? `$${(order as any).total.toFixed(2)}` : '$0.00';
+            const displayId = formatOrderId(idx);
+            const customerName = usersMap[String(order.userId)] || (order.userId ? String(order.userId).slice(0,8) : 'guest');
             return (
-              <div className="om-row" key={order.id}>
-                <span className="om-cell id">{order.id}</span>
+              <div className="om-row hover:bg-gray-50" key={order.id}>
+                <span className="om-cell id">{displayId}</span>
                 <span className="om-cell date">{order.date}</span>
-                <span className="om-cell customer">{order.userId || 'guest'}</span>
+                <span className="om-cell customer">{customerName}</span>
                 <span className="om-cell total">{totalText}</span>
                 <span className="om-cell status">
-                  <span className={`status-badge ${String(order.status).toLowerCase()}`}>{order.status}</span>
+                  <span className={`status-badge ${mapOrderStatusToBadge(order.status)}`}>{order.status}</span>
                 </span>
                 <span className="om-cell actions">
                   {canDeliver && (
-                    <button className="btn success" onClick={() => handleUpdateStatus(order.id, OrderStatus.DELIVERED)}>✓ Mark Delivered</button>
+                    <button className="px-3 py-1 rounded-md bg-emerald-600 text-white text-sm mr-2" onClick={() => handleUpdateStatus(order.id, OrderStatus.DELIVERED)}>✓ Mark Delivered</button>
                   )}
                   {canShip && (
-                    <button className="btn primary" onClick={() => handleUpdateStatus(order.id, OrderStatus.SHIPPED)}>📦 Mark Shipped</button>
+                    <button className="px-3 py-1 rounded-md bg-indigo-600 text-white text-sm mr-2" onClick={() => handleUpdateStatus(order.id, OrderStatus.SHIPPED)}>📦 Mark Shipped</button>
                   )}
                   {canCancel && (
-                    <button className="btn danger" onClick={() => handleUpdateStatus(order.id, OrderStatus.CANCELLED)}>✕ Cancel</button>
+                    <button className="px-3 py-1 rounded-md bg-rose-600 text-white text-sm" onClick={() => handleUpdateStatus(order.id, OrderStatus.CANCELLED)}>✕ Cancel</button>
                   )}
                   {!canShip && !canDeliver && !canCancel && (
                     <span className="om-muted">No actions available</span>
@@ -119,7 +147,7 @@ const OrderManagement: React.FC = () => {
             </div>
           ) : (
             <div className="returns-list">
-              {ordersWithReturns.map((order) => {
+              {ordersWithReturns.map((order, idx) => {
                 const returnReq = order.returnRequest!;
                 const canApprove = returnReq.status === 'Requested';
                 const canComplete = returnReq.status === 'Approved';
@@ -129,13 +157,13 @@ const OrderManagement: React.FC = () => {
                   <div className="return-card card" key={order.id}>
                     <div className="return-header">
                       <div className="return-info">
-                        <h4>Order #{order.id}</h4>
-                        <p className="return-date">Requested: {new Date(returnReq.requestedAt?.toDate?.() || returnReq.requestedAt).toLocaleDateString()}</p>
-                        <p className="return-customer">Customer: {order.userId || 'guest'}</p>
+                        <h4>{formatOrderId(idx)}</h4>
+                        <p className="return-date">Requested: {new Date(returnReq.requestedAt || '').toLocaleDateString()}</p>
+                        <p className="return-customer">Customer: {usersMap[String(order.userId)] || (order.userId ? String(order.userId).slice(0, 8) : 'guest')}</p>
                         <p className="return-total">Total: {totalText}</p>
                       </div>
                       <div className="return-status">
-                        <span className={`status-badge ${returnReq.status.toLowerCase()}`}>{returnReq.status}</span>
+                        <span className={`status-badge ${mapOrderStatusToBadge(returnReq.status)}`}>{returnReq.status}</span>
                       </div>
                     </div>
 
@@ -165,14 +193,14 @@ const OrderManagement: React.FC = () => {
                         <div className="form-actions">
                           <button
                             className="btn success"
-                            onClick={() => handleUpdateReturnRequest(order.id, 'Approved', returnComment)}
+                            onClick={() => setPendingReturnAction({ orderId: order.id, status: 'Approved' })}
                             disabled={returnBusy}
                           >
                             {returnBusy ? 'Processing...' : '✓ Approve Return'}
                           </button>
                           <button
                             className="btn danger"
-                            onClick={() => handleUpdateReturnRequest(order.id, 'Declined', returnComment)}
+                            onClick={() => setPendingReturnAction({ orderId: order.id, status: 'Declined' })}
                             disabled={returnBusy}
                           >
                             {returnBusy ? 'Processing...' : '✕ Decline Return'}
@@ -222,6 +250,20 @@ const OrderManagement: React.FC = () => {
           )}
         </div>
       )}
+
+      <Modal
+        open={Boolean(pendingReturnAction)}
+        title={pendingReturnAction ? (pendingReturnAction.status === 'Approved' ? 'Approve Return' : 'Decline Return') : undefined}
+        variant={pendingReturnAction ? (pendingReturnAction.status === 'Approved' ? 'success' : 'danger') : 'neutral'}
+        confirmLabel={'Yes, Confirm'}
+        confirmDisabled={returnBusy}
+        onClose={() => setPendingReturnAction(null)}
+        onConfirm={confirmPendingReturnAction}
+      >
+        <p>
+          Are you sure you want to {pendingReturnAction?.status === 'Approved' ? 'approve' : 'decline'} this return request? This action will update the order return status immediately.
+        </p>
+      </Modal>
     </div>
   );
 };
