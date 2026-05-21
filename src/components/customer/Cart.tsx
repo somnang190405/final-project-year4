@@ -48,8 +48,8 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-12">
-        <section className="flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section className="lg:col-span-2">
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm uppercase tracking-[0.24em] text-indigo-600 font-semibold mb-2">Shopping Cart</p>
@@ -88,7 +88,7 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                       <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-700">
                         <button
                           onClick={() => updateCartQty(item.id, Math.max(1, item.quantity - 1))}
-                          className="rounded-full p-2 hover:bg-slate-200 transition-all"
+                          className="rounded-full p-2 hover:bg-slate-200 transition-all duration-200 hover:scale-105"
                           aria-label="Decrease quantity"
                         >
                           <Minus size={16} />
@@ -96,7 +96,7 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                         <span className="min-w-[2rem] text-center font-semibold">{item.quantity}</span>
                         <button
                           onClick={() => updateCartQty(item.id, Math.max(1, item.quantity + 1))}
-                          className="rounded-full p-2 hover:bg-slate-200 transition-all"
+                          className="rounded-full p-2 hover:bg-slate-200 transition-all duration-200 hover:scale-105"
                           aria-label="Increase quantity"
                         >
                           <Plus size={16} />
@@ -104,7 +104,7 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
                       </div>
                       <button
                         onClick={() => removeFromCart(item.id)}
-                        className="inline-flex items-center gap-2 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors transform hover:scale-105 duration-200"
                       >
                         <Trash2 size={16} /> Remove
                       </button>
@@ -138,7 +138,7 @@ const Cart = ({ cart, updateCartQty, removeFromCart, user, setView, notify }: Pr
           </div>
         </section>
 
-        <aside className="lg:w-[400px] flex-shrink-0">
+        <aside className="lg:col-span-1">
           <div className="sticky top-8 space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_28px_80px_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between gap-4 mb-6">

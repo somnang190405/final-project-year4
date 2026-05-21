@@ -147,7 +147,7 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
           <div className="mb-6">
             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
               <CheckCircle2 size={18} className="text-green-600" />
-              <span>Orders over $50 get next‑day delivery.</span>
+              <span>Free delivery on orders over $100.</span>
             </div>
           </div>
 
