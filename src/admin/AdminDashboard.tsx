@@ -433,9 +433,9 @@ const AdminDashboard: React.FC = () => {
       };
 
       const response = await supabase
-        .from('products')
-        .insert<SupabaseProductRow>([payload])
-        .select();
+      .from('products') // Automatically infers the correct row type
+      .insert(payload)
+      .select();
 
       if (response.error) {
         throw response.error;
