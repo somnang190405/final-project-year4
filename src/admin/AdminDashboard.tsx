@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { listenProducts, listenOrders, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists } from "../services/firestoreService";
-import { supabase } from "../../scripts/supabaseClient";
+import { listenProducts, listenOrders, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists, uploadProductImage as firebaseUploadProductImage } from "../services/firestoreService";
 import { Product, Order, OrderStatus } from "../types";
 import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
@@ -227,7 +226,7 @@ const AdminDashboard: React.FC = () => {
     return blob;
   };
 
-  // Upload image to Supabase Storage with improved error handling
+  // Upload image to Firebase Storage with improved error handling
   const uploadProductImage = async (file: File): Promise<string> => {
     try {
       if (!file) {
@@ -249,37 +248,20 @@ const AdminDashboard: React.FC = () => {
       const compressedBlob = await downscaleImage(file);
       console.log('Image compressed:', { compressedSize: compressedBlob.size });
 
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').replace(/_+/g, '_');
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}.jpg`;
-      const filePath = `products/${fileName}`;
-
+      // Convert blob to File object for Firebase upload
+      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+      
       setUploadProgress(0);
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, compressedBlob, {
-          contentType: 'image/jpeg',
-        });
-
-      if (error || !data) {
-        throw error || new Error('Supabase upload failed');
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-
-      if (!publicUrlData?.publicUrl) {
-        throw new Error('Failed to get public image URL');
-      }
-
+      const imageUrl = await firebaseUploadProductImage(compressedFile, 'product');
+      
       setUploadProgress(100);
       setUploadError(null);
-      console.log('Upload successful:', { publicUrl: publicUrlData.publicUrl });
-      return publicUrlData.publicUrl;
+      console.log('Upload successful:', { imageUrl });
+      return imageUrl;
     } catch (error: any) {
       let message = error?.message || 'Failed to process upload.';
       if (message.includes('ERR_FAILED') || message.includes('NetworkError') || message.includes('CORS')) {
-        message = 'Upload blocked by browser network policy. Check your Supabase storage bucket and public URL settings.';
+        message = 'Upload blocked by browser network policy. Check your Firebase storage bucket and settings.';
       }
       setUploadProgress(null);
       setUploadError(message);
