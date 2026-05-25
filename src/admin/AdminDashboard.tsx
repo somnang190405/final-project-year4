@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { listenProducts, listenOrders, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists } from "../services/firestoreService";
-import { supabase } from "../../scripts/supabaseClient";
+import { listenProducts, listenOrders, updateProduct, deleteProduct, listenCategories, addCategoryIfNotExists, uploadProductImage as firebaseUploadProductImage, createProduct } from "../services/firestoreService";
 import { Product, Order, OrderStatus } from "../types";
 import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
@@ -227,7 +226,7 @@ const AdminDashboard: React.FC = () => {
     return blob;
   };
 
-  // Upload image to Supabase Storage with improved error handling
+  // Upload image to Firebase Storage with improved error handling
   const uploadProductImage = async (file: File): Promise<string> => {
     try {
       if (!file) {
@@ -249,37 +248,20 @@ const AdminDashboard: React.FC = () => {
       const compressedBlob = await downscaleImage(file);
       console.log('Image compressed:', { compressedSize: compressedBlob.size });
 
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').replace(/_+/g, '_');
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}.jpg`;
-      const filePath = `products/${fileName}`;
-
+      // Convert blob to File object for Firebase upload
+      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+      
       setUploadProgress(0);
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, compressedBlob, {
-          contentType: 'image/jpeg',
-        });
-
-      if (error || !data) {
-        throw error || new Error('Supabase upload failed');
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-
-      if (!publicUrlData?.publicUrl) {
-        throw new Error('Failed to get public image URL');
-      }
-
+      const imageUrl = await firebaseUploadProductImage(compressedFile, 'product');
+      
       setUploadProgress(100);
       setUploadError(null);
-      console.log('Upload successful:', { publicUrl: publicUrlData.publicUrl });
-      return publicUrlData.publicUrl;
+      console.log('Upload successful:', { imageUrl });
+      return imageUrl;
     } catch (error: any) {
       let message = error?.message || 'Failed to process upload.';
       if (message.includes('ERR_FAILED') || message.includes('NetworkError') || message.includes('CORS')) {
-        message = 'Upload blocked by browser network policy. Check your Supabase storage bucket and public URL settings.';
+        message = 'Upload blocked by browser network policy. Check your Firebase storage bucket and settings.';
       }
       setUploadProgress(null);
       setUploadError(message);
@@ -405,62 +387,22 @@ const AdminDashboard: React.FC = () => {
         throw new Error('Image URL could not be generated. Please try again.');
       }
 
-      type SupabaseProductRow = {
-        id: number;
-        name: string;
-        price: number;
-        stock: number;
-        category: string;
-        subcategory: string;
-        promotion_percent: number;
-        is_featured: boolean;
-        description: string;
-        image_url: string;
-        created_at: string;
-      };
-
-      const payload: Omit<SupabaseProductRow, 'id' | 'created_at'> & { created_at: string } = {
+      // Create product using Firebase/Firestore
+      const createdProduct = await createProduct({
         name: productName,
         price: productPrice,
         stock: productStock,
         category: productCategory,
         subcategory: productSubcategory,
-        promotion_percent: Math.round(productPromotionPercent),
-        is_featured: productIsFeatured,
-        description: productDescription,
-        image_url: imageUrl,
-        created_at: new Date().toISOString(),
-      };
-
-      const response = await supabase
-      .from('products') // Automatically infers the correct row type
-      .insert(payload)
-      .select();
-
-      if (response.error) {
-        throw response.error;
-      }
-
-      const data = response.data as SupabaseProductRow[] | null;
-      if (!data || data.length === 0) {
-        throw new Error('No product was inserted.');
-      }
-
-      const insertedRow = data[0];
-      const insertedProduct: Product = {
-        id: String(insertedRow.id ?? Date.now()),
-        name: insertedRow.name,
-        price: Number(insertedRow.price),
-        promotionPercent: Number(insertedRow.promotion_percent) || 0,
-        category: insertedRow.category,
-        subcategory: insertedRow.subcategory,
-        image: insertedRow.image_url,
-        description: insertedRow.description,
-        stock: Number(insertedRow.stock),
-        rating: 0,
+        promotionPercent: Math.round(productPromotionPercent),
         isNewArrival: productIsFeatured,
+        description: productDescription,
+        image: imageUrl,
+        rating: 0,
         colors: [],
-      };
+      });
+
+      const insertedProduct: Product = createdProduct;
 
       setProducts((prev) => [...prev, insertedProduct]);
       await addCategoryIfNotExists(productCategory);
@@ -490,8 +432,8 @@ const AdminDashboard: React.FC = () => {
     } catch (error: any) {
       console.error("Error creating product:", error);
       let message = error?.message || "Failed to create product. Please try again.";
-      if (message.includes('row-level security')) {
-        message = 'Insert blocked by Supabase row-level security. Add an insert policy for the products table or use a server-side insert path.';
+      if (message.includes('permission') || message.includes('denied')) {
+        message = 'Insert failed due to permission error. Check your Firebase Firestore security rules and ensure admin users have write access to the products collection.';
       }
       setUploadError(message);
       setToast({ message, type: "error" });
