@@ -1,6 +1,7 @@
 import { db, firebaseApp } from './firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, getDoc, onSnapshot, query, where, serverTimestamp, orderBy, limit, runTransaction, arrayUnion, arrayRemove, writeBatch } from 'firebase/firestore';
 import * as Types from '../types';
+import { uploadImage as imageKitUpload } from './imagekit';
 
 const productsCollection = collection(db, 'products');
 
@@ -47,13 +48,82 @@ export const getProducts = async (): Promise<Types.Product[]> => {
   return snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Types.Product, 'id'>) }));
 };
 
+function isRetryableFirestoreError(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  return msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state');
+}
+
+function listenWithRetry<T>(
+  label: string,
+  startListener: (onNext: (data: T) => void, onError: (err: Error) => void) => () => void,
+  cb: (data: T) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  let retryCount = 0;
+  let cleanup: (() => void) | null = null;
+  let cancelled = false;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  const maxRetries = 10;
+  const baseDelay = 1000;
+
+  const start = () => {
+    if (cancelled) return;
+    // Unsubscribe previous listener before creating a new one on retry,
+    // preventing stale onSnapshot accumulation that causes
+    // "FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state".
+    if (cleanup) {
+      cleanup();
+      cleanup = null;
+    }
+    cleanup = startListener(
+      (data) => {
+        retryCount = 0;
+        cb(data);
+      },
+      (err) => {
+        console.error(`${label} error:`, err);
+        if (isRetryableFirestoreError(err) && retryCount < maxRetries && !cancelled) {
+          retryCount++;
+          const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), 8000);
+          console.warn(`${label} assertion error, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          retryTimer = setTimeout(start, delay);
+          return;
+        }
+        if (onError) onError(err);
+      }
+    );
+  };
+
+  start();
+
+  return () => {
+    cancelled = true;
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    if (cleanup) {
+      cleanup();
+      cleanup = null;
+    }
+  };
+}
+
 // Real-time product listener
-export const listenProducts = (cb: (products: Types.Product[]) => void) => {
-  const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
-    const data = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Types.Product, 'id'>) }));
-    cb(data);
-  });
-  return unsubscribe;
+export const listenProducts = (cb: (products: Types.Product[]) => void, onError?: (err: Error) => void) => {
+  return listenWithRetry<Types.Product[]>(
+    'listenProducts',
+    (next, err) =>
+      onSnapshot(
+        productsCollection,
+        (snapshot) => {
+          next(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Types.Product, 'id'>) })));
+        },
+        (e) => err(e as Error)
+      ),
+    cb,
+    onError
+  );
 };
 
 export const createProduct = async (product: Omit<Types.Product, 'id'>): Promise<Types.Product> => {
@@ -80,38 +150,21 @@ export const createProduct = async (product: Omit<Types.Product, 'id'>): Promise
   return created;
 };
 
-// Upload a product image file to Firebase Storage and return its download URL
+// Upload a product image file to ImageKit.io and return its URL
 export const uploadProductImage = async (file: File, productName: string): Promise<string> => {
-  // Lazy-load Firebase Storage so it doesn't bloat the initial customer bundle.
-  const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-  const storage = getStorage(firebaseApp);
-  const filename = file.name ? file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_') : 'image';
   const base = productName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 30) || 'product';
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}-${filename}`;
-  const imageRef = ref(storage, `products/${unique}`);
-  const metadata = {
-    contentType: file.type || 'image/jpeg',
-    cacheControl: 'public, max-age=31536000'
-  } as any;
-  const snapshot = await uploadBytes(imageRef, file, metadata);
-  const url = await getDownloadURL(snapshot.ref);
-  return url;
+  const ext = file.name ? file.name.split('.').pop() || 'jpg' : 'jpg';
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}.${ext}`;
+  const result = await imageKitUpload(file, unique, '/products');
+  return result.url;
 };
 
 export const uploadUserAvatar = async (file: File, userId: string): Promise<string> => {
-  const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-  const storage = getStorage(firebaseApp);
-  const filename = file.name ? file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_') : 'avatar';
   const base = userId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 30) || 'user';
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}-${filename}`;
-  const imageRef = ref(storage, `avatars/${unique}`);
-  const metadata = {
-    contentType: file.type || 'image/jpeg',
-    cacheControl: 'public, max-age=31536000'
-  } as any;
-  const snapshot = await uploadBytes(imageRef, file, metadata);
-  const url = await getDownloadURL(snapshot.ref);
-  return url;
+  const ext = file.name ? file.name.split('.').pop() || 'jpg' : 'jpg';
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}.${ext}`;
+  const result = await imageKitUpload(file, unique, '/avatars');
+  return result.url;
 };
 
 // Create product with image file upload
@@ -292,28 +345,32 @@ export const listenUserCartItems = (userId: string, cb: (items: CartLine[]) => v
     cb([]);
     return () => {};
   }
-  const cartCol = collection(db, 'users', userId, 'cartItems');
-  const unsub = onSnapshot(
-    cartCol,
-    (snap) => {
-      const items = snap.docs
-        .map((d) => {
-          const data = d.data() as any;
-          const productId = String(data?.productId || d.id);
-          const quantity = Math.max(1, Number(data?.quantity || 1));
-          if (!productId) return null;
-          return { productId, quantity } as CartLine;
-        })
-        .filter(Boolean) as CartLine[];
-      items.sort((a, b) => a.productId.localeCompare(b.productId));
-      cb(items);
-    },
-    (err) => {
-      console.error('Error listening to cartItems:', err);
-      cb([]);
-    }
+  return listenWithRetry<CartLine[]>(
+    'listenUserCartItems',
+    (next, err) =>
+      onSnapshot(
+        collection(db, 'users', userId, 'cartItems'),
+        (snap) => {
+          const items = snap.docs
+            .map((d) => {
+              const data = d.data() as any;
+              const productId = String(data?.productId || d.id);
+              const quantity = Math.max(1, Number(data?.quantity || 1));
+              if (!productId) return null;
+              return { productId, quantity } as CartLine;
+            })
+            .filter(Boolean) as CartLine[];
+          items.sort((a, b) => a.productId.localeCompare(b.productId));
+          next(items);
+        },
+        (e) => {
+          console.error('Error listening to cartItems:', e);
+          cb([]);
+          err(e as Error);
+        }
+      ),
+    cb
   );
-  return unsub;
 };
 
 // Batch-sync cartItems using a known previous snapshot (recommended to avoid extra reads).
@@ -432,22 +489,26 @@ export const getUserFromFirestore = async (userId: string): Promise<Types.User |
 
 // Real-time user profile listener (cart/wishlist/etc)
 export const listenUser = (userId: string, cb: (user: Types.User | null) => void) => {
-  const userRef = doc(db, 'users', userId);
-  const unsub = onSnapshot(
-    userRef,
-    (snap) => {
-      if (!snap.exists()) {
-        cb(null);
-        return;
-      }
-      cb(mapUserDoc(userId, snap.data() as Partial<Types.User>));
-    },
-    (err) => {
-      console.error('Error listening to user:', err);
-      cb(null);
-    }
+  return listenWithRetry<Types.User | null>(
+    'listenUser',
+    (next, err) =>
+      onSnapshot(
+        doc(db, 'users', userId),
+        (snap) => {
+          if (!snap.exists()) {
+            next(null);
+            return;
+          }
+          next(mapUserDoc(userId, snap.data() as Partial<Types.User>));
+        },
+        (e) => {
+          console.error('Error listening to user:', e);
+          cb(null);
+          err(e as Error);
+        }
+      ),
+    cb
   );
-  return unsub;
 };
 
 // Get all users
@@ -533,10 +594,15 @@ export const createOrderAndDecrementStock = async (order: Omit<Types.Order, 'id'
     //   tx.update(doc(db, 'products', productId), { stock: prevStock - qty } as any);
     // }
 
+    // Strip undefined values (Firestore rejects them in transactions)
+    const cleanOrder = Object.fromEntries(
+      Object.entries(order).filter(([_, v]) => v !== undefined)
+    );
+
     tx.set(
       orderRef,
       {
-        ...order,
+        ...cleanOrder,
         createdAt: serverTimestamp(),
         // Track that stock has already been deducted at checkout.
         stockAdjusted: true,
@@ -554,37 +620,48 @@ export const listenOrdersByUser = (
   cb: (orders: Types.Order[]) => void,
   onError?: (error: Error) => void
 ) => {
-  const ordersCol = collection(db, 'orders');
-  const q = query(ordersCol, where('userId', '==', userId));
-  const unsubscribe = onSnapshot(
-    q,
-    (snapshot) => {
-      const data = snapshot.docs
-        .map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[];
-      data.sort((a: any, b: any) => {
-        const ad = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.date || '')) ?? 0) as number;
-        const bd = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.date || '')) ?? 0) as number;
-        return bd - ad;
-      });
-      cb(data);
-    },
-    (err) => {
-      console.error('Failed to listen orders:', err);
-      if (onError) onError(err as Error);
-      cb([]);
-    }
+  const q = query(collection(db, 'orders'), where('userId', '==', userId));
+  return listenWithRetry<Types.Order[]>(
+    'listenOrdersByUser',
+    (next, err) =>
+      onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[];
+          data.sort((a: any, b: any) => {
+            const ad = (a?.createdAt?.toMillis?.() ?? Date.parse(String(a?.date || '')) ?? 0) as number;
+            const bd = (b?.createdAt?.toMillis?.() ?? Date.parse(String(b?.date || '')) ?? 0) as number;
+            return bd - ad;
+          });
+          next(data);
+        },
+        (e) => {
+          console.error('Failed to listen orders:', e);
+          cb([]);
+          err(e as Error);
+        }
+      ),
+    cb,
+    onError
   );
-  return unsubscribe;
 };
 
 // Real-time orders listener
-export const listenOrders = (cb: (orders: Types.Order[]) => void) => {
-  const ordersCol = collection(db, 'orders');
-  const unsubscribe = onSnapshot(ordersCol, (snapshot) => {
-    const data = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[];
-    cb(data);
-  });
-  return unsubscribe;
+export const listenOrders = (cb: (orders: Types.Order[]) => void, onError?: (err: Error) => void) => {
+  return listenWithRetry<Types.Order[]>(
+    'listenOrders',
+    (next, err) =>
+      onSnapshot(
+        collection(db, 'orders'),
+        (snapshot) => {
+          next(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Partial<Types.Order>) })) as Types.Order[]);
+        },
+        (e) => err(e as Error)
+      ),
+    cb,
+    onError
+  );
 };
 
 // Update order status
@@ -686,13 +763,20 @@ export const getSalesReports = async (): Promise<any[]> => {
 // -------------------- Categories (Persistent) --------------------
 export type Category = { id: string; name: string };
 
-export const listenCategories = (cb: (categories: Category[]) => void) => {
-  const categoriesCol = collection(db, 'categories');
-  const unsubscribe = onSnapshot(categoriesCol, (snapshot) => {
-    const data = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Category, 'id'>) })) as Category[];
-    cb(data);
-  });
-  return unsubscribe;
+export const listenCategories = (cb: (categories: Category[]) => void, onError?: (err: Error) => void) => {
+  return listenWithRetry<Category[]>(
+    'listenCategories',
+    (next, err) =>
+      onSnapshot(
+        collection(db, 'categories'),
+        (snapshot) => {
+          next(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Category, 'id'>) })) as Category[]);
+        },
+        (e) => err(e as Error)
+      ),
+    cb,
+    onError
+  );
 };
 
 export const addCategoryIfNotExists = async (nameRaw: string) => {
