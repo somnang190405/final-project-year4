@@ -37,60 +37,176 @@
 
 /* Status badges */
 .status-badge { 
-  font-size: 12px; 
-  font-weight: 700; 
-  border-radius: 8px; 
-  padding: 5px 10px; 
-  display: inline-block; 
-}
-.status-badge.delivered { background: #dcfce7; color: #166534; }
-.status-badge.shipped { background: #dbeafe; color: #1e40af; }
-.status-badge.pending { background: #fef3c7; color: #92400e; }
-.status-badge.cancelled { background: #fee2e2; color: #7f1d1d; }
-
-/* Buttons */
-.btn { 
-  border: 1px solid transparent; 
-  border-radius: 10px; 
-  padding: 10px 16px; 
-  font-size: 13px; 
+  font-size: 11px; 
   font-weight: 600; 
-  cursor: pointer; 
-  transition: all .15s ease; 
-  margin-right: 8px; 
+  border-radius: 9999px; 
+  padding: 4px 10px; 
+  display: inline-block; 
+  letter-spacing: 0.02em;
 }
-.btn.primary { background: #2563eb; color: #fff; }
-.btn.primary:hover { background: #1d4ed8; }
-.btn.success { background: #16a34a; color: #fff; }
-.btn.success:hover { background: #15803d; }
-.btn.danger { background: #ef4444; color: #fff; }
-.btn.danger:hover { background: #dc2626; }
-.btn.secondary { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
-.btn.secondary:hover { background: #e5e7eb; }
+.status-badge.delivered { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.status-badge.shipped { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-badge.pending { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.status-badge.cancelled { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
+
+/* Order action text buttons */
+.order-actions-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.order-action-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.order-action-text:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.order-action-text.ship {
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+
+.order-action-text.ship:hover {
+  background: #eef2ff;
+  border-color: #4f46e5;
+}
+
+.order-action-text.deliver {
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.order-action-text.deliver:hover {
+  background: #ecfdf5;
+  border-color: #10b981;
+}
+
+.order-action-text.cancel {
+  color: #e11d48;
+  border-color: #fecaca;
+}
+
+.order-action-text.cancel:hover {
+  background: #fef2f2;
+  border-color: #f43f5e;
+}
+
+/* Return action buttons */
+.btn-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: #ffffff;
+  color: #475569;
+}
+
+.btn-return:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.btn-return:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-return.approve {
+  border-color: #10b981;
+  color: #059669;
+}
+
+.btn-return.approve:hover:not(:disabled) {
+  background: #ecfdf5;
+  border-color: #059669;
+}
+
+.btn-return.decline {
+  border-color: #f43f5e;
+  color: #e11d48;
+}
+
+.btn-return.decline:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #e11d48;
+}
+
+.btn-return.review {
+  border-color: #6366f1;
+  color: #4f46e5;
+}
+
+.btn-return.review:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #4f46e5;
+}
+
+.btn-return.complete {
+  border-color: #10b981;
+  color: #059669;
+}
+
+.btn-return.complete:hover:not(:disabled) {
+  background: #ecfdf5;
+  border-color: #059669;
+}
+
+.btn-return.cancel-btn {
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.btn-return.cancel-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
 
 /* Tabs */
 .tabs {
   display: flex;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e2e8f0;
   margin-bottom: 24px;
+  gap: 0;
 }
 .tab {
   padding: 12px 24px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #6b7280;
+  color: #64748b;
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
+  margin-bottom: -1px;
 }
 .tab:hover {
-  color: #374151;
+  color: #334155;
 }
 .tab.active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
 }
 
 /* Return Management */
@@ -198,20 +314,10 @@
   align-items: center;
 }
 
-/* Status badge base */
-.status-badge {
-  display: inline-block;
-  font-weight: 600;
-  border-radius: 9999px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-/* Requested / Pending: amber */
-.status-badge.requested { background: #fffbeb; color: #92400e; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
-/* Approved / Completed: emerald */
-.status-badge.approved, .status-badge.completed { background: #ecfdf5; color: #166534; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
-/* Declined / Cancelled: rose */
-.status-badge.declined, .status-badge.cancelled { background: #fff1f2; color: #9f1239; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 12px; }
+/* Return status badges */
+.status-badge.requested { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 11px; letter-spacing: 0.02em; }
+.status-badge.approved, .status-badge.completed { background: #ecfdf5; color: #166534; border: 1px solid #bbf7d0; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 11px; letter-spacing: 0.02em; }
+.status-badge.declined { background: #fff1f2; color: #9f1239; border: 1px solid #fecaca; padding: 4px 10px; font-weight: 600; border-radius: 9999px; font-size: 11px; letter-spacing: 0.02em; }
 
 .modal-backdrop {
   position: fixed;

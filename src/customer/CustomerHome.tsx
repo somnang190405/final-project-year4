@@ -19,6 +19,8 @@ type Props = {
 const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequireAuth }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,13 +71,20 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequi
 
   useEffect(() => {
     setLoading(true);
-    const unsub = listenProducts((data) => {
-      // Keep sold-out items so the UI can show a Sold Out badge.
-      setProducts(data);
-      setLoading(false);
-    });
+    setFetchError(null);
+    const unsub = listenProducts(
+      (data) => {
+        setProducts(data);
+        setLoading(false);
+        setFetchError(null);
+      },
+      (err) => {
+        setFetchError('Failed to load products. The connection may be unstable.');
+        setLoading(false);
+      }
+    );
     return () => { if (unsub) unsub(); };
-  }, []);
+  }, [retryKey]);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -181,7 +190,17 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequi
             </form>
           </div>
 
-          {loading ? (
+          {fetchError && !loading && products.length === 0 ? (
+            <div className="text-center" style={{ padding: 24, width: '100%' }}>
+              <p className="text-gray-500 mb-4">{fetchError}</p>
+              <button
+                onClick={() => { setRetryKey((k) => k + 1); }}
+                style={{ padding: '10px 24px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : loading ? (
             <div className="text-center text-gray-500" style={{ padding: 24, width: '100%' }}>Loading products...</div>
           ) : products.length === 0 ? (
             <div className="text-center text-gray-500" style={{ padding: 24, width: '100%' }}>No products available yet.</div>

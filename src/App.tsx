@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, Link,
 import CustomerHome from "./customer/CustomerHome";
 import LandingPage from "./customer/LandingPage";
 import AuthModal from "./components/AuthModal";
+import ErrorBoundary from "./ErrorBoundary";
 import { auth } from "./services/firebase";
 import {
   signInWithEmailAndPassword,
@@ -51,6 +52,7 @@ const SearchPage = React.lazy(() => import("./customer/SearchPage"));
 const ProfilePage = React.lazy(() => import("./customer/ProfilePage"));
 const OrdersPage = React.lazy(() => import("./customer/OrdersPage"));
 const PaymentPage = React.lazy(() => import("./customer/PaymentPage"));
+const OrderDetailsPage = React.lazy(() => import("./customer/OrderDetailsPage"));
 const NewArrivalsPage = React.lazy(() => import("./customer/NewArrivalsPage"));
 const Wishlist = React.lazy(() => import("./components/customer/Wishlist"));
 const Shop = React.lazy(() => import("./components/customer/Shop"));
@@ -207,6 +209,19 @@ const Navbar = ({
 
 // --- Main App Component ---
 
+// Global handler for Firestore SDK assertion errors (b815/ca9) that slip through
+(window as any).__firestoreAssertionGuard = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const msg = String(event.reason?.message || event.reason || '');
+    if (msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state')) {
+      event.preventDefault();
+      console.warn('Caught Firestore assertion error globally; prevented crash.');
+      (window as any).__firestoreAssertionGuard = true;
+    }
+  });
+}
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isRegister, setIsRegister] = useState(false);
@@ -301,9 +316,12 @@ const App: React.FC = () => {
           setUser(resolvedUser);
           setWishlist(resolvedUser.wishlist || []);
 
-          // Do not auto-redirect based on role; keep current route.
+          // Auto-navigate admins to /admin if they are on a non-admin route after login
           const onAdminRoute = window.location.pathname.startsWith('/admin');
           setPage(onAdminRoute && resolvedUser.role === UserRole.ADMIN ? 'Admin' : 'Home');
+          if (resolvedUser.role === UserRole.ADMIN && !onAdminRoute && window.location.pathname !== '/login') {
+            // Don't force redirect here to avoid loops; the handleAuth timeout handles it
+          }
         } catch (error) {
           console.error("Error fetching user data:", error);
           // Keep UI usable if Firestore is unavailable but Auth is signed in.
@@ -454,11 +472,21 @@ const App: React.FC = () => {
         showToast("Signed in successfully!", "success");
       }
       setShowAuthModal(false);
+      // After successful login, redirect to admin if admin, else follow post-auth redirect
       const redirectTo = postAuthRedirect;
       setPostAuthRedirect(null);
-      if (redirectTo) {
-        try { window.location.href = redirectTo; } catch {}
-      }
+      // Wait briefly for onAuthStateChanged to sync user state
+      setTimeout(() => {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const isAdmin = isAdminEmail(currentUser.email);
+          if (isAdmin && !redirectTo) {
+            try { window.location.href = '/admin'; } catch {}
+          } else if (redirectTo) {
+            try { window.location.href = redirectTo; } catch {}
+          }
+        }
+      }, 300);
     } catch (error: any) {
       showToast(friendlyAuthError(error), "error");
     } finally {
@@ -555,7 +583,9 @@ const App: React.FC = () => {
                     user?.role === UserRole.ADMIN ? (
                       <Navigate to="/admin" replace />
                     ) : (
-                      <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/')} />
+                      <ErrorBoundary>
+                        <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/')} />
+                      </ErrorBoundary>
                     )
                   }
                 />
@@ -565,7 +595,9 @@ const App: React.FC = () => {
                     user?.role === UserRole.ADMIN ? (
                       <Navigate to="/admin" replace />
                     ) : (
-                      <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/home')} />
+                      <ErrorBoundary>
+                        <CustomerHome wishlist={wishlist} toggleWishlist={handleToggleWishlist} user={user} onRequireAuth={() => requireAuth('/home')} />
+                      </ErrorBoundary>
                     )
                   }
                 />
@@ -573,7 +605,9 @@ const App: React.FC = () => {
                   path="/admin"
                   element={
                     user?.role === UserRole.ADMIN ? (
-                      <AdminDashboard />
+                      <ErrorBoundary key={user?.id || 'admin'}>
+                        <AdminDashboard />
+                      </ErrorBoundary>
                     ) : (
                       <Navigate to="/" replace />
                     )
@@ -589,7 +623,19 @@ const App: React.FC = () => {
                     )
                   }
                 />
-                <Route path="/login" element={<Navigate to="/" replace />} />
+                <Route
+                  path="/login"
+                  element={
+                    user ? (
+                      <Navigate to={user.role === UserRole.ADMIN ? "/admin" : "/"} replace />
+                    ) : (
+                      <Auth onAuthSuccess={(u) => {
+                        setUser(u);
+                        setShowAuthModal(false);
+                      }} />
+                    )
+                  }
+                />
                 <Route
                   path="/profile"
                   element={
@@ -665,6 +711,16 @@ const App: React.FC = () => {
                       <Navigate to="/admin" replace />
                     ) : (
                       <OrdersPage user={user} onRequireAuth={requireAuth} />
+                    )
+                  }
+                />
+                <Route
+                  path="/order/:id"
+                  element={
+                    user?.role === UserRole.ADMIN ? (
+                      <Navigate to="/admin" replace />
+                    ) : (
+                      <OrderDetailsPage user={user} onRequireAuth={requireAuth} />
                     )
                   }
                 />

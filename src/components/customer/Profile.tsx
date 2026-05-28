@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/mockBackend';
 import { Order, User } from '../../types';
+import { formatOrderIdFromDoc } from '../../utils/formatIds';
 import { Package, CheckCircle, Truck, Clock, User as UserIcon } from 'lucide-react';
 
 const Profile = ({ user }: { user: User }) => {
@@ -71,7 +72,7 @@ const Profile = ({ user }: { user: User }) => {
                     </div>
                     <div className="hidden sm:block">
                       <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Order ID</p>
-                      <p className="font-mono text-gray-600">#{order.id}</p>
+                      <p className="font-bold text-gray-900">{formatOrderIdFromDoc(order.id)}</p>
                     </div>
                   </div>
                   <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${statusStyle.bg} ${statusStyle.text}`}>
