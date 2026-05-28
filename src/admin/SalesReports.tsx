@@ -115,13 +115,9 @@ const SalesReports: React.FC = () => {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-10">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Sales Reports</h1>
-          <p className="mt-2 text-sm text-slate-600">Summary metrics and recent order trends for your store.</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+    <div className="max-w-[1400px] mx-auto px-4 py-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-end mb-6">
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm text-slate-700">
             <span className="font-semibold text-slate-900">From</span>
             <input className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" type="date" value={fromISO} max={toISO || todayISO} onChange={(e) => setFromISO(e.target.value)} />

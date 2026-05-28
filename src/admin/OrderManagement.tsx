@@ -3,6 +3,7 @@ import { getAllOrders, updateOrderStatus, updateOrderReturnRequest, getAllUsers 
 import { Order, OrderStatus } from "../types";
 import { formatOrderId } from '../utils/formatIds';
 import Modal from '../components/Modal';
+import { X, Search, Check } from "lucide-react";
 import './OrderManagement.css';
 
 const OrderManagement: React.FC = () => {
@@ -119,18 +120,26 @@ const OrderManagement: React.FC = () => {
                   <span className={`status-badge ${mapOrderStatusToBadge(order.status)}`}>{order.status}</span>
                 </span>
                 <span className="om-cell actions">
-                  {canDeliver && (
-                    <button className="px-3 py-1 rounded-md bg-emerald-600 text-white text-sm mr-2" onClick={() => handleUpdateStatus(order.id, OrderStatus.DELIVERED)}>✓ Mark Delivered</button>
-                  )}
-                  {canShip && (
-                    <button className="px-3 py-1 rounded-md bg-indigo-600 text-white text-sm mr-2" onClick={() => handleUpdateStatus(order.id, OrderStatus.SHIPPED)}>📦 Mark Shipped</button>
-                  )}
-                  {canCancel && (
-                    <button className="px-3 py-1 rounded-md bg-rose-600 text-white text-sm" onClick={() => handleUpdateStatus(order.id, OrderStatus.CANCELLED)}>✕ Cancel</button>
-                  )}
-                  {!canShip && !canDeliver && !canCancel && (
-                    <span className="om-muted">No actions available</span>
-                  )}
+                  <div className="order-actions-group">
+                    {canShip && (
+                      <button className="order-action-text ship" onClick={() => handleUpdateStatus(order.id, OrderStatus.SHIPPED)}>
+                        Ship
+                      </button>
+                    )}
+                    {canDeliver && (
+                      <button className="order-action-text deliver" onClick={() => handleUpdateStatus(order.id, OrderStatus.DELIVERED)}>
+                        Deliver
+                      </button>
+                    )}
+                    {canCancel && (
+                      <button className="order-action-text cancel" onClick={() => handleUpdateStatus(order.id, OrderStatus.CANCELLED)}>
+                        Cancel
+                      </button>
+                    )}
+                    {!canShip && !canDeliver && !canCancel && (
+                      <span className="om-muted">—</span>
+                    )}
+                  </div>
                 </span>
               </div>
             );
@@ -192,21 +201,23 @@ const OrderManagement: React.FC = () => {
                         />
                         <div className="form-actions">
                           <button
-                            className="btn success"
+                            className="btn-return approve"
                             onClick={() => setPendingReturnAction({ orderId: order.id, status: 'Approved' })}
                             disabled={returnBusy}
                           >
-                            {returnBusy ? 'Processing...' : '✓ Approve Return'}
+                            <Check size={15} />
+                            {returnBusy ? 'Processing...' : 'Approve'}
                           </button>
                           <button
-                            className="btn danger"
+                            className="btn-return decline"
                             onClick={() => setPendingReturnAction({ orderId: order.id, status: 'Declined' })}
                             disabled={returnBusy}
                           >
-                            {returnBusy ? 'Processing...' : '✕ Decline Return'}
+                            <X size={15} />
+                            {returnBusy ? 'Processing...' : 'Decline'}
                           </button>
                           <button
-                            className="btn secondary"
+                            className="btn-return cancel-btn"
                             onClick={() => {
                               setActiveReturnOrder(null);
                               setReturnComment('');
@@ -221,19 +232,21 @@ const OrderManagement: React.FC = () => {
                     <div className="return-actions">
                       {canApprove && (
                         <button
-                          className="btn primary"
+                          className="btn-return review"
                           onClick={() => setActiveReturnOrder(order.id)}
                         >
-                          Review Request
+                          <Search size={15} />
+                          Review
                         </button>
                       )}
                       {canComplete && (
                         <button
-                          className="btn success"
+                          className="btn-return complete"
                           onClick={() => handleUpdateReturnRequest(order.id, 'Completed')}
                           disabled={returnBusy}
                         >
-                          {returnBusy ? 'Processing...' : '✓ Mark Completed'}
+                          <Check size={15} />
+                          {returnBusy ? 'Processing...' : 'Complete'}
                         </button>
                       )}
                       {returnReq.status === 'Declined' && (

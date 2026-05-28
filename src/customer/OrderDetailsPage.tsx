@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { listenOrders } from '../services/firestoreService';
 import { Order, OrderStatus, User } from '../types';
+import { formatOrderIdFromDoc } from '../utils/formatIds';
 
 type Props = {
   user: User | null;
@@ -145,7 +146,7 @@ const OrderDetailsPage: React.FC<Props> = ({ user, onRequireAuth }) => {
     );
   }
 
-  const orderNo = `#${String(order.id).slice(0, 10)}`;
+  const orderNo = formatOrderIdFromDoc(order.id);
   const date = formatDate(order.date || '');
   const paid = String(order.paymentStatus || '').toUpperCase() === 'PAID' || !!order.paidAt;
   const qty = (order.items || []).reduce((sum, it) => sum + (it.quantity || 0), 0);

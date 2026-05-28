@@ -140,6 +140,7 @@ export const createProduct = async (product: Omit<Types.Product, 'id'>): Promise
     price: product.price,
     promotionPercent: (product as any).promotionPercent,
     category: product.category,
+    subcategory: product.subcategory,
     image: product.image,
     description: product.description,
     stock: product.stock,

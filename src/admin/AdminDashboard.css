@@ -5,22 +5,23 @@
 .admin-dashboard-root.light {
   display: flex;
   min-height: 100vh;
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .admin-sidebar.light {
   width: 280px;
   background: #ffffff;
-  padding: 24px 16px;
+  padding: 20px 14px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid #f1f5f9;
   position: sticky;
   top: 0;
   height: 100vh;
   overflow-y: auto;
   box-sizing: border-box;
+  box-shadow: 1px 0 0 rgba(226, 232, 240, 0.5);
 }
 
 .sidebar-top {
@@ -31,7 +32,7 @@
 
 .sidebar-divider {
   height: 1px;
-  background: #e2e8f0;
+  background: #f1f5f9;
   margin: auto 0 12px;
 }
 
@@ -41,6 +42,7 @@
 
 .logout-item {
   color: #ef4444 !important;
+  margin-top: 4px;
 }
 
 .logout-item:hover {
@@ -57,20 +59,18 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 800;
-  font-size: 1.1rem;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  padding: 12px;
+  padding: 14px 12px;
   border-radius: 12px;
-  background-color: #eef2ff;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
-.brand-icon { font-size: 1.5rem; display: flex; align-items: center; }
-.brand-name { font-size: 1.1rem; letter-spacing: -0.01em; }
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+}
 
 .side-nav { display: flex; flex-direction: column; gap: 4px; }
 
@@ -78,7 +78,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 11px 14px;
   border-radius: 10px;
   border: none;
   background: transparent;
@@ -92,9 +92,8 @@
 }
 
 .nav-item:hover {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #334155;
-  transform: none;
 }
 
 .nav-item.active {
@@ -104,12 +103,12 @@
   box-shadow: inset 3px 0 0 #4f46e5;
 }
 
-.nav-icon { width: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.nav-icon { width: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: currentColor; }
 
 /* --- Topbar --- */
 .admin-main.light {
   flex: 1;
-  padding: 28px 32px;
+  padding: 28px 36px;
   overflow-y: auto;
   background: #f8fafc;
 }
@@ -120,13 +119,14 @@
   justify-content: space-between;
   margin-bottom: 28px;
   background: #ffffff;
-  padding: 18px 24px;
-  border-radius: 12px;
+  padding: 18px 28px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .page-title {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -137,20 +137,22 @@
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  gap: 22px;
   margin-bottom: 28px;
 }
 
 .card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 14px;
   padding: 24px;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .card:hover {
   border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.06);
 }
 
 .metric {
@@ -163,35 +165,37 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
-  background: #eef2ff;
-  color: #4f46e5;
+  background: #f8fafc;
+  color: #64748b;
   flex-shrink: 0;
 }
 
 .metric-label {
   color: #64748b;
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
 .metric-value {
   font-weight: 800;
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   color: #0f172a;
-  margin-top: 2px;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .card-title {
   font-weight: 700;
-  font-size: 1.05rem;
-  color: #1e293b;
-  margin-bottom: 16px;
+  font-size: 1rem;
+  color: #0f172a;
+  margin-bottom: 20px;
+  letter-spacing: -0.01em;
 }
 
 /* --- Bar Chart --- */
@@ -200,7 +204,7 @@
   align-items: flex-end;
   gap: 12px;
   height: 200px;
-  padding: 16px 0;
+  padding: 8px 4px 16px;
 }
 
 .bar {
@@ -213,22 +217,23 @@
 
 .bar-fill {
   width: 100%;
-  max-width: 40px;
-  background: linear-gradient(180deg, #4f46e5, #7c3aed);
-  border-radius: 6px 6px 0 0;
+  max-width: 36px;
+  background: #475569;
+  border-radius: 4px 4px 0 0;
   transition: all 0.2s ease;
   min-height: 4px;
 }
 
 .bar:hover .bar-fill {
-  opacity: 0.8;
-  transform: scaleY(1.03);
+  opacity: 0.85;
+  transform: scaleY(1.04);
 }
 
 .bar-label {
   color: #64748b;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
+  text-align: center;
 }
 
 /* --- Revenue Empty State --- */
@@ -331,6 +336,10 @@
   margin: 4px 0 0;
   color: #64748b;
   font-size: 0.9rem;
+}
+
+.products-section .section-header-actions {
+  margin-bottom: 20px;
 }
 
 .section-header-actions {
@@ -1161,7 +1170,7 @@
 
   .nav-item.active { box-shadow: inset 0 -3px 0 #4f46e5; }
 
-  .brand { justify-content: center; }
+  .brand { justify-content: center; padding: 10px 12px; }
 
   .admin-main.light { padding: 16px; }
 

@@ -360,7 +360,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                           setReturnError('');
                           setWizardStep(2);
                         }}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
                       >
                         Continue <ArrowRight size={16} />
                       </button>
@@ -421,7 +421,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                           setReturnError('');
                           setWizardStep(3);
                         }}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
                       >
                         Continue <ArrowRight size={16} />
                       </button>
@@ -475,7 +475,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                       <button
                         onClick={handleSubmitReturn}
                         disabled={returnBusy}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black font-semibold text-sm hover:shadow-lg hover:shadow-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {returnBusy ? 'Submitting...' : 'Submit Return Request'} {!returnBusy && <Check size={16} />}
                       </button>

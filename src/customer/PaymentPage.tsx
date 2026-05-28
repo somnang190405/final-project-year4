@@ -106,7 +106,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
       };
 
       let paymentStatus: 'PAID' | 'UNPAID' = 'UNPAID';
-      let paidAt: string | null = null;
+      let paidAt: string | undefined = undefined;
       let method: string;
 
       if (paymentMethod === 'card') {
@@ -126,7 +126,7 @@ const PaymentPage: React.FC<Props> = ({ user, onRequireAuth }) => {
         status: OrderStatus.PENDING,
         paymentStatus,
         paymentMethod: method as any,
-        paidAt: paidAt || null,
+        paidAt,
         paymentDetails,
         total,
         items: cart.map((i) => ({

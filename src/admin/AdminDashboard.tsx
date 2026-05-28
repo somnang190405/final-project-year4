@@ -6,7 +6,7 @@ import "./AdminDashboard.css";
 import UserManagement from "./UserManagement";
 import OrderManagement from "./OrderManagement";
 import SalesReports from "./SalesReports";
-import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, ShieldCheck, Plus, Edit, Trash2, Upload, LogOut } from "lucide-react";
+import { BarChart3, Home, Package, ShoppingCart, Users as UsersIcon, LayoutDashboard, Plus, Edit, Trash2, Upload, LogOut } from "lucide-react";
 import { auth } from "../services/firebase";
 
 const AdminDashboard: React.FC = () => {
@@ -592,7 +592,6 @@ const AdminDashboard: React.FC = () => {
       <aside className="admin-sidebar light">
         <div className="sidebar-top">
           <div className="brand">
-            <span className="brand-icon" aria-hidden="true"><ShieldCheck size={18} /></span>
             <button type="button" onClick={goHome} className="brand-name brand-button" style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>
               TinhMe Dashboard
             </button>
@@ -616,7 +615,7 @@ const AdminDashboard: React.FC = () => {
             </button>
             <button className={`nav-item ${activeView === "sales" ? "active" : ""}`} onClick={() => setActiveView("sales")}>
               <span className="nav-icon" aria-hidden="true"><BarChart3 size={18} /></span>
-              <span>Reports</span>
+              <span>Sales Reports</span>
             </button>
           </nav>
         </div>
@@ -712,32 +711,26 @@ const AdminDashboard: React.FC = () => {
         )}
         {activeView === "products" && (
           <section className="products-section">
-            <div className="section-header">
-              <div>
-                <h2 className="section-title">Manage Products</h2>
-                <p className="section-subtitle">Search and manage inventory with filters and quick actions.</p>
-              </div>
-              <div className="section-header-actions">
-                <input
-                  type="search"
-                  value={productSearchTerm}
-                  onChange={(e) => setProductSearchTerm(e.target.value)}
-                  placeholder="Search products by name, category or subcategory"
-                  className="search-input"
-                />
-                <button
-                  className="primary-btn add-product-btn"
-                  onClick={() => {
-                    setAddProductStep(1);
-                    setSelectedCategory("");
-                    setSelectedSubcategory("");
-                    setShowAddModal(true);
-                  }}
-                >
-                  <Plus size={16} />
-                  Add Product
-                </button>
-              </div>
+            <div className="section-header-actions">
+              <input
+                type="search"
+                value={productSearchTerm}
+                onChange={(e) => setProductSearchTerm(e.target.value)}
+                placeholder="Search products by name, category or subcategory"
+                className="search-input"
+              />
+              <button
+                className="primary-btn add-product-btn"
+                onClick={() => {
+                  setAddProductStep(1);
+                  setSelectedCategory("");
+                  setSelectedSubcategory("");
+                  setShowAddModal(true);
+                }}
+              >
+                <Plus size={16} />
+                Add Product
+              </button>
             </div>
 
             <div className="products-table-container">
