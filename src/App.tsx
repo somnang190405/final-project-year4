@@ -209,14 +209,26 @@ const Navbar = ({
 
 // --- Main App Component ---
 
-// Global handler for Firestore SDK assertion errors (b815/ca9) that slip through
+// Global handlers for Firestore SDK assertion errors (b815/ca9) that slip through
 (window as any).__firestoreAssertionGuard = false;
 if (typeof window !== 'undefined') {
+  const isFirestoreAssertion = (msg: string) =>
+    msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state');
+
   window.addEventListener('unhandledrejection', (event) => {
     const msg = String(event.reason?.message || event.reason || '');
-    if (msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state')) {
+    if (isFirestoreAssertion(msg)) {
       event.preventDefault();
-      console.warn('Caught Firestore assertion error globally; prevented crash.');
+      console.warn('Caught Firestore assertion error (unhandledrejection); prevented crash.');
+      (window as any).__firestoreAssertionGuard = true;
+    }
+  });
+
+  window.addEventListener('error', (event) => {
+    const msg = String(event.error?.message || event.message || event.error || '');
+    if (isFirestoreAssertion(msg)) {
+      event.preventDefault();
+      console.warn('Caught Firestore assertion error (error event); prevented crash.');
       (window as any).__firestoreAssertionGuard = true;
     }
   });
@@ -407,18 +419,18 @@ const App: React.FC = () => {
 
   const handleToggleWishlist = (productId: string) => {
     const product = products.find((p) => p.id === productId);
-    if (!product) return;
+    const productName = product?.name || 'Product';
 
     setWishlist((prev) => {
       const exists = prev.includes(productId);
       if (exists) {
-        showToast(`${product.name} removed from wishlist.`, "success");
+        showToast(`${productName} removed from wishlist.`, "success");
         const next = prev.filter((id) => id !== productId);
         // Persist to Firestore if signed in (atomic)
         if (user) void removeFromWishlist(user.id, productId).catch(() => {});
         return next;
       } else {
-        showToast(`${product.name} added to wishlist.`, "success");
+        showToast(`${productName} added to wishlist.`, "success");
         const next = [...prev, productId];
         if (user) void addToWishlist(user.id, productId).catch(() => {});
         return next;
@@ -547,8 +559,9 @@ const App: React.FC = () => {
                 setUser(null);
                 setPage('Home');
                 showToast('Logged out successfully.', 'success');
-                // Redirect to home after logout
-                try { window.location.href = '/'; } catch {}
+                // Use React Router navigation instead of full page reload
+                // to avoid abruptly destroying Firestore listeners mid-flight.
+                navigate('/');
               } catch (e) {
                 showToast('Failed to logout. Try again.', 'error');
               }
