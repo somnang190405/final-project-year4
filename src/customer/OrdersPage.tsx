@@ -223,11 +223,11 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 py-10">
         {/* Page Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
+          <h1 className="text-3xl font-bold text-black">My Orders</h1>
           <p className="text-gray-500 mt-2">Track, manage, and return your purchases</p>
         </div>
 
@@ -245,12 +245,12 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
             </button>
             <button
               className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                tab === 'return' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-600 hover:text-gray-900'
+                tab === 'return' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-black shadow-lg shadow-indigo-200' : 'text-black hover:text-gray-900'
               }`}
               onClick={() => setTab('return')}
             >
               <RotateCcw size={16} className="inline mr-2 -mt-0.5" />
-              Return Center
+              Return Product
             </button>
           </div>
         </div>
@@ -574,7 +574,7 @@ const OrdersPage: React.FC<Props> = ({ user, onRequireAuth }) => {
                           <span className="text-sm text-gray-500">{date}</span>
                           <button
                             onClick={() => handleStartReturn(order.id)}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-black text-sm font-semibold hover:shadow-lg hover:shadow-indigo-200 transition flex items-center gap-2"
                           >
                             <RotateCcw size={14} />
                             Request Return

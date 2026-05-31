@@ -79,6 +79,15 @@ const CustomerHome: React.FC<Props> = ({ wishlist, toggleWishlist, user, onRequi
         setFetchError(null);
       },
       (err) => {
+        const msg = String(err?.message || err || '');
+        // Firestore internal assertion errors are transient — the retry
+        // mechanism in listenWithRetry will re-establish the listener.
+        if (msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state')) {
+          console.warn('CustomerHome: Firestore assertion error (ignored):', msg);
+          // Don't leave loading stuck — if no products arrived yet, show empty state.
+          setLoading(false);
+          return;
+        }
         setFetchError('Failed to load products. The connection may be unstable.');
         setLoading(false);
       }

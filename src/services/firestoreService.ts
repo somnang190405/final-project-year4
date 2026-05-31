@@ -66,32 +66,53 @@ function listenWithRetry<T>(
   const maxRetries = 10;
   const baseDelay = 1000;
 
+  const safeCleanup = () => {
+    if (cleanup) {
+      try {
+        cleanup();
+      } catch (e) {
+        console.warn(`${label} cleanup error (expected during signout/login):`, e);
+      }
+      cleanup = null;
+    }
+  };
+
   const start = () => {
     if (cancelled) return;
     // Unsubscribe previous listener before creating a new one on retry,
     // preventing stale onSnapshot accumulation that causes
     // "FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state".
-    if (cleanup) {
-      cleanup();
-      cleanup = null;
-    }
-    cleanup = startListener(
-      (data) => {
-        retryCount = 0;
-        cb(data);
-      },
-      (err) => {
-        console.error(`${label} error:`, err);
-        if (isRetryableFirestoreError(err) && retryCount < maxRetries && !cancelled) {
-          retryCount++;
-          const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), 8000);
-          console.warn(`${label} assertion error, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
-          retryTimer = setTimeout(start, delay);
-          return;
+    safeCleanup();
+    try {
+      cleanup = startListener(
+        (data) => {
+          retryCount = 0;
+          cb(data);
+        },
+        (err) => {
+          console.error(`${label} error:`, err);
+          if (isRetryableFirestoreError(err) && retryCount < maxRetries && !cancelled) {
+            retryCount++;
+            const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), 8000);
+            console.warn(`${label} assertion error, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            retryTimer = setTimeout(start, delay);
+            return;
+          }
+          if (onError) onError(err);
         }
-        if (onError) onError(err);
+      );
+    } catch (e) {
+      console.warn(`${label} start error (expected during signout/login):`, e);
+      cleanup = null;
+      if (isRetryableFirestoreError(e) && retryCount < maxRetries && !cancelled) {
+        retryCount++;
+        const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), 8000);
+        console.warn(`${label} assertion error on start, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+        retryTimer = setTimeout(start, delay);
+        return;
       }
-    );
+      if (onError) onError(e instanceof Error ? e : new Error(String(e)));
+    }
   };
 
   start();
@@ -102,10 +123,7 @@ function listenWithRetry<T>(
       clearTimeout(retryTimer);
       retryTimer = null;
     }
-    if (cleanup) {
-      cleanup();
-      cleanup = null;
-    }
+    safeCleanup();
   };
 }
 

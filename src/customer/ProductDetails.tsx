@@ -218,7 +218,6 @@ const ProductDetails: React.FC<Props> = ({ wishlist, toggleWishlist, user, onReq
                   return;
                 }
                 if (toggleWishlist && product) toggleWishlist(product.id);
-                setWishlisted((w) => !w);
               }}
               className="w-12 h-12 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:border-gray-300"
             >

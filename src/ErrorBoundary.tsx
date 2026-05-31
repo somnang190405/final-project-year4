@@ -1,21 +1,40 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
-type State = { hasError: boolean; message?: string; error?: Error };
+type State = { hasError: boolean; message?: string; error?: Error; isFirestoreAssertion: boolean };
 
 export class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, State> {
-  state: State = { hasError: false };
+  state: State = { hasError: false, isFirestoreAssertion: false };
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   static getDerivedStateFromError(error: any): State {
-    return { hasError: true, message: error?.message || 'Something went wrong.', error };
+    const msg = String(error?.message || error || '');
+    const isFirestoreAssertion = msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state');
+    return {
+      hasError: true,
+      isFirestoreAssertion,
+      message: isFirestoreAssertion
+        ? 'A temporary Firebase connection issue occurred. Retrying automatically...'
+        : (error?.message || 'Something went wrong.'),
+      error,
+    };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    // Auto-retry for Firestore assertion errors to recover gracefully
+    // without showing an error page to the user.
+    if (this.state.isFirestoreAssertion) {
+      this.retryTimer = setTimeout(() => this.handleRetry(), 500);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, message: undefined, error: undefined });
+    this.setState({ hasError: false, message: undefined, error: undefined, isFirestoreAssertion: false });
   };
 
   render() {
@@ -28,7 +47,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, 
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Dashboard Error</h2>
             <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-              {this.state.message || 'An unexpected error occurred. This may be a temporary Firebase connection issue.'}
+              {this.state.message}
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
